@@ -1,0 +1,41 @@
+import fs from 'fs';
+
+const map = JSON.parse(fs.readFileSync('public/data/college_logos_map.json', 'utf8'));
+
+function createGmcSvg(initials, sub) {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240">
+  <defs>
+    <linearGradient id="g1_${initials}" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a2540" />
+      <stop offset="100%" stop-color="#1e3a8a" />
+    </linearGradient>
+    <linearGradient id="gold_${initials}" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24" />
+      <stop offset="50%" stop-color="#d97706" />
+      <stop offset="100%" stop-color="#b45309" />
+    </linearGradient>
+  </defs>
+  <path d="M 120 12 C 175 12, 218 32, 218 78 C 218 148, 168 198, 120 226 C 72 198, 22 148, 22 78 C 22 32, 65 12, 120 12 Z" fill="url(#gold_${initials})" />
+  <path d="M 120 18 C 170 18, 210 36, 210 80 C 210 144, 162 192, 120 218 C 78 192, 30 144, 30 80 C 30 36, 70 18, 120 18 Z" fill="url(#g1_${initials})" stroke="#ffffff" stroke-width="2" stroke-opacity="0.3" />
+  <circle cx="120" cy="100" r="62" fill="none" stroke="url(#gold_${initials})" stroke-width="2" stroke-dasharray="3 3" opacity="0.6" />
+  <g transform="translate(120, 78) scale(0.68)" opacity="0.95">
+    <line x1="0" y1="-44" x2="0" y2="44" stroke="#fbbf24" stroke-width="4.5" stroke-linecap="round" />
+    <circle cx="0" cy="-46" r="6" fill="#fbbf24" />
+    <path d="M -16 -28 C -6 -36, 14 -32, 14 -20 C 14 -10, -14 -12, -14 -2 C -14 8, 16 6, 16 18 C 16 28, -12 28, -12 36" fill="none" stroke="#fef3c7" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M -5 -46 L 5 -46 M 0 -51 L 0 -41" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round"/>
+  </g>
+  <rect x="36" y="128" width="168" height="34" rx="8" fill="#ffffff" />
+  <text x="120" y="152" font-family="sans-serif" font-size="19" font-weight="900" fill="#0a2540" text-anchor="middle" letter-spacing="1.5">${initials}</text>
+  <text x="120" y="180" font-family="sans-serif" font-size="8.5" font-weight="700" fill="#fef3c7" text-anchor="middle" letter-spacing="1">${sub}</text>
+</svg>`;
+}
+
+fs.writeFileSync('public/logos/colleges/gmc-amritsar.svg', createGmcSvg('GMCA', 'GOVT OF PUNJAB'));
+fs.writeFileSync('public/logos/colleges/gmc-srinagar.svg', createGmcSvg('GMCS', 'GOVT OF J&K'));
+
+map['MED-PB-GMC-01'] = '/logos/colleges/gmc-amritsar.svg';
+map['MED-JK-GMC-01'] = '/logos/colleges/gmc-srinagar.svg';
+
+fs.writeFileSync('public/data/college_logos_map.json', JSON.stringify(map, null, 2));
+console.log('Added GMC Amritsar and GMC Srinagar logos successfully');
