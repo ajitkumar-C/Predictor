@@ -158,8 +158,35 @@ function convertScoreToRank(exam, val) {
 }
 
 // -------------------------------------------------------------
-// Data Fetching & Caching
+// Data Fetching & Caching (With Multi-Path Fallback for Cloudflare / Static Hosting)
 // -------------------------------------------------------------
+async function fetchJsonWithFallback(urlPath) {
+  const cleanPath = urlPath.startsWith('/') ? urlPath : '/' + urlPath;
+  const candidates = [
+    cleanPath,
+    cleanPath.startsWith('/data/') ? cleanPath.replace('/data/', '/public/data/') : '/public' + cleanPath,
+    '.' + cleanPath,
+    './public' + cleanPath
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      const res = await fetch(candidate);
+      if (!res.ok) continue;
+      const text = await res.text();
+      const trimmed = text.trim();
+      // If server returned an HTML error/SPA fallback page (starts with <!DOCTYPE or <html or <)
+      if (trimmed.startsWith('<')) continue;
+
+      const parsed = JSON.parse(trimmed);
+      return parsed;
+    } catch (_) {
+      // try next candidate
+    }
+  }
+  throw new Error(`Failed to load valid JSON from ${urlPath}`);
+}
+
 async function loadDataset(examKey) {
   const config = EXAM_CONFIGS[examKey];
   if (state.datasets[examKey]) {
@@ -168,9 +195,7 @@ async function loadDataset(examKey) {
   }
 
   try {
-    const res = await fetch(config.dataFile);
-    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
-    const data = await res.json();
+    const data = await fetchJsonWithFallback(config.dataFile);
     state.datasets[examKey] = data;
     state.activeDataset = data;
     return data;
@@ -182,16 +207,16 @@ async function loadDataset(examKey) {
 
 async function loadDirectories() {
   try {
-    const [medRes, engRes, logoRes, masterRes] = await Promise.all([
-      fetch('/data/medical_colleges_directory.json'),
-      fetch('/data/engineering_colleges_directory.json'),
-      fetch('/data/medical_college_logos.json'),
-      fetch('/data/college_master_details.json')
+    const [med, eng, logos, master] = await Promise.all([
+      fetchJsonWithFallback('/data/medical_colleges_directory.json').catch(() => []),
+      fetchJsonWithFallback('/data/engineering_colleges_directory.json').catch(() => []),
+      fetchJsonWithFallback('/data/medical_college_logos.json').catch(() => ({ byId: {}, byName: {} })),
+      fetchJsonWithFallback('/data/college_master_details.json').catch(() => ({}))
     ]);
-    if (medRes.ok) state.medicalDirectory = await medRes.json();
-    if (engRes.ok) state.engineeringDirectory = await engRes.json();
-    if (logoRes.ok) state.medicalLogos = await logoRes.json();
-    if (masterRes.ok) state.collegeMasterDetails = await masterRes.json();
+    if (med && (Array.isArray(med) ? med.length : Object.keys(med).length)) state.medicalDirectory = med;
+    if (eng && (Array.isArray(eng) ? eng.length : Object.keys(eng).length)) state.engineeringDirectory = eng;
+    if (logos) state.medicalLogos = logos;
+    if (master) state.collegeMasterDetails = master;
   } catch (e) {
     console.error('Failed to load directories', e);
   }
@@ -515,7 +540,7 @@ function getCollegeLogoBadge(name, type, explicitLogo, collegeId) {
 
     return `
       <div class="inst-logo-badge has-img ${badgeClass}" title="${name}">
-        <img src="${actualLogo}" alt="${name} logo" class="inst-logo-img" loading="lazy" onerror="this.parentElement.classList.remove('has-img'); this.remove();" />
+        <img src="${actualLogo}" alt="${name} logo" class="inst-logo-img" loading="lazy" onerror="if(!this.dataset.retried && !this.src.includes('/public/')){ this.dataset.retried='1'; this.src = '/public' + new URL(this.src).pathname; } else { this.parentElement.classList.remove('has-img'); this.remove(); }" />
       </div>
     `;
   }
