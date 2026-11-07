@@ -20,3 +20,4 @@ for (const file of files) {
   fs.writeFileSync(file, html, 'utf8');
   console.log(`Updated ${file}`);
 }
+
