@@ -1,0 +1,241 @@
+const fs = require('fs');
+const path = require('path');
+
+const catalogPath = path.join(__dirname, '..', 'data', 'mcq', 'test_series_catalog.json');
+const publicCatalogPath = path.join(__dirname, '..', 'public', 'data', 'mcq', 'test_series_catalog.json');
+
+const testSeriesCatalog = {
+  "NEET-UG": [
+    {
+      id: "NEET-2024-FULL",
+      title: "NEET UG 2024 Official Full Mock Paper",
+      subtitle: "Official NTA Pattern • May 2024 Session",
+      year: 2024,
+      exam: "NEET-UG",
+      totalMarks: 720,
+      durationMinutes: 180,
+      totalQuestions: 180,
+      markingScheme: "+4 / -1 Marking",
+      difficulty: "Moderate",
+      badge: "High Yield 2024",
+      benchmarks: {
+        aiimsCutoff: 690,
+        gmcCutoff: 635,
+        bdsCutoff: 580
+      },
+      sections: [
+        { id: "physics", name: "Physics", count: 45, marks: 180, icon: "bi-lightning-charge-fill", color: "#0284c7" },
+        { id: "chemistry", name: "Chemistry", count: 45, marks: 180, icon: "bi-eyedropper", color: "#d97706" },
+        { id: "biology", name: "Biology (Botany & Zoology)", count: 90, marks: 360, icon: "bi-virus2", color: "#10b981" }
+      ],
+      highlights: [
+        "100% NCERT line-by-line coverage",
+        "Includes statement-based & assertion-reason questions",
+        "Direct AIR rank projection based on MCC cutoffs"
+      ]
+    },
+    {
+      id: "NEET-2023-FULL",
+      title: "NEET UG 2023 Official Full Mock Paper",
+      subtitle: "Official NTA Shift Paper • May 7 Session",
+      year: 2023,
+      exam: "NEET-UG",
+      totalMarks: 720,
+      durationMinutes: 180,
+      totalQuestions: 180,
+      markingScheme: "+4 / -1 Marking",
+      difficulty: "Easy to Moderate",
+      badge: "Verified PYQ",
+      benchmarks: {
+        aiimsCutoff: 685,
+        gmcCutoff: 615,
+        bdsCutoff: 565
+      },
+      sections: [
+        { id: "physics", name: "Physics", count: 45, marks: 180, icon: "bi-lightning-charge-fill", color: "#0284c7" },
+        { id: "chemistry", name: "Chemistry", count: 45, marks: 180, icon: "bi-eyedropper", color: "#d97706" },
+        { id: "biology", name: "Biology (Botany & Zoology)", count: 90, marks: 360, icon: "bi-virus2", color: "#10b981" }
+      ],
+      highlights: [
+        "Standard difficulty baseline paper",
+        "High weightage in Genetics & Cell Biology",
+        "Detailed step-by-step NCERT verified solutions"
+      ]
+    },
+    {
+      id: "NEET-2022-FULL",
+      title: "NEET UG 2022 Official Full Mock Paper",
+      subtitle: "Official NTA Shift Paper • July 17 Session",
+      year: 2022,
+      exam: "NEET-UG",
+      totalMarks: 720,
+      durationMinutes: 180,
+      totalQuestions: 180,
+      markingScheme: "+4 / -1 Marking",
+      difficulty: "Moderate to Challenging",
+      badge: "Comprehensive",
+      benchmarks: {
+        aiimsCutoff: 675,
+        gmcCutoff: 605,
+        bdsCutoff: 550
+      },
+      sections: [
+        { id: "physics", name: "Physics", count: 45, marks: 180, icon: "bi-lightning-charge-fill", color: "#0284c7" },
+        { id: "chemistry", name: "Chemistry", count: 45, marks: 180, icon: "bi-eyedropper", color: "#d97706" },
+        { id: "biology", name: "Biology (Botany & Zoology)", count: 90, marks: 360, icon: "bi-virus2", color: "#10b981" }
+      ],
+      highlights: [
+        "Analytical physics numericals",
+        "Extensive plant & human physiology coverage",
+        "Direct link to College Predictor"
+      ]
+    },
+    {
+      id: "NEET-2021-FULL",
+      title: "NEET UG 2021 Official Full Mock Paper",
+      subtitle: "Official NTA Shift Paper • September 12 Session",
+      year: 2021,
+      exam: "NEET-UG",
+      totalMarks: 720,
+      durationMinutes: 180,
+      totalQuestions: 180,
+      markingScheme: "+4 / -1 Marking",
+      difficulty: "Moderate",
+      badge: "Classic Paper",
+      benchmarks: {
+        aiimsCutoff: 670,
+        gmcCutoff: 595,
+        bdsCutoff: 535
+      },
+      sections: [
+        { id: "physics", name: "Physics", count: 45, marks: 180, icon: "bi-lightning-charge-fill", color: "#0284c7" },
+        { id: "chemistry", name: "Chemistry", count: 45, marks: 180, icon: "bi-eyedropper", color: "#d97706" },
+        { id: "biology", name: "Biology (Botany & Zoology)", count: 90, marks: 360, icon: "bi-virus2", color: "#10b981" }
+      ],
+      highlights: [
+        "First paper with modern Section A & B pattern",
+        "Thorough organic mechanism questions",
+        "Instant score analysis & accuracy breakdown"
+      ]
+    }
+  ],
+  "JEE-MAIN": [
+    {
+      id: "JEE-2024-JAN-S1",
+      title: "JEE Main 2024 Session 1 (Jan 27 Shift 1)",
+      subtitle: "Official NTA Computer-Based Test Paper",
+      year: 2024,
+      exam: "JEE-MAIN",
+      totalMarks: 300,
+      durationMinutes: 180,
+      totalQuestions: 75,
+      markingScheme: "+4 / -1 Marking",
+      difficulty: "Moderate",
+      badge: "Session 1 PYQ",
+      benchmarks: {
+        nitTrichyCSE: 260,
+        topNITCutoff: 210,
+        qualifyingAdv: 140
+      },
+      sections: [
+        { id: "physics-jee", name: "Physics", count: 25, marks: 100, icon: "bi-cpu-fill", color: "#0284c7" },
+        { id: "chemistry-jee", name: "Chemistry", count: 25, marks: 100, icon: "bi-eyedropper", color: "#d97706" },
+        { id: "mathematics-jee", name: "Mathematics", count: 25, marks: 100, icon: "bi-calculator-fill", color: "#7c3aed" }
+      ],
+      highlights: [
+        "Balanced difficulty across Physics & Chemistry",
+        "Calculus & Coordinate Geometry weightage",
+        "Calculates JEE Percentile & JoSAA Cutoff Rank"
+      ]
+    },
+    {
+      id: "JEE-2024-APR-S1",
+      title: "JEE Main 2024 Session 2 (Apr 4 Shift 1)",
+      subtitle: "Official NTA Computer-Based Test Paper",
+      year: 2024,
+      exam: "JEE-MAIN",
+      totalMarks: 300,
+      durationMinutes: 180,
+      totalQuestions: 75,
+      markingScheme: "+4 / -1 Marking",
+      difficulty: "Challenging",
+      badge: "Session 2 PYQ",
+      benchmarks: {
+        nitTrichyCSE: 255,
+        topNITCutoff: 205,
+        qualifyingAdv: 138
+      },
+      sections: [
+        { id: "physics-jee", name: "Physics", count: 25, marks: 100, icon: "bi-cpu-fill", color: "#0284c7" },
+        { id: "chemistry-jee", name: "Chemistry", count: 25, marks: 100, icon: "bi-eyedropper", color: "#d97706" },
+        { id: "mathematics-jee", name: "Mathematics", count: 25, marks: 100, icon: "bi-calculator-fill", color: "#7c3aed" }
+      ],
+      highlights: [
+        "Modern syllabus alignment with deleted topics removed",
+        "High-yield 3D Geometry and Vector questions",
+        "Instant percentile & college predictor sync"
+      ]
+    },
+    {
+      id: "JEE-2023-JAN-S1",
+      title: "JEE Main 2023 Session 1 (Jan 24 Shift 1)",
+      subtitle: "Official NTA Computer-Based Test Paper",
+      year: 2023,
+      exam: "JEE-MAIN",
+      totalMarks: 300,
+      durationMinutes: 180,
+      totalQuestions: 75,
+      markingScheme: "+4 / -1 Marking",
+      difficulty: "Moderate",
+      badge: "Core Benchmark",
+      benchmarks: {
+        nitTrichyCSE: 250,
+        topNITCutoff: 195,
+        qualifyingAdv: 130
+      },
+      sections: [
+        { id: "physics-jee", name: "Physics", count: 25, marks: 100, icon: "bi-cpu-fill", color: "#0284c7" },
+        { id: "chemistry-jee", name: "Chemistry", count: 25, marks: 100, icon: "bi-eyedropper", color: "#d97706" },
+        { id: "mathematics-jee", name: "Mathematics", count: 25, marks: 100, icon: "bi-calculator-fill", color: "#7c3aed" }
+      ],
+      highlights: [
+        "Moderate Physics with formula-based questions",
+        "Inorganic & Physical Chemistry core problems",
+        "Step-by-step verified solutions"
+      ]
+    },
+    {
+      id: "JEE-2022-JULY-S1",
+      title: "JEE Main 2022 July Session (July 25 Shift 1)",
+      subtitle: "Official NTA Computer-Based Test Paper",
+      year: 2022,
+      exam: "JEE-MAIN",
+      totalMarks: 300,
+      durationMinutes: 180,
+      totalQuestions: 75,
+      markingScheme: "+4 / -1 Marking",
+      difficulty: "Challenging",
+      badge: "Tough Math Paper",
+      benchmarks: {
+        nitTrichyCSE: 245,
+        topNITCutoff: 190,
+        qualifyingAdv: 125
+      },
+      sections: [
+        { id: "physics-jee", name: "Physics", count: 25, marks: 100, icon: "bi-cpu-fill", color: "#0284c7" },
+        { id: "chemistry-jee", name: "Chemistry", count: 25, marks: 100, icon: "bi-eyedropper", color: "#d97706" },
+        { id: "mathematics-jee", name: "Mathematics", count: 25, marks: 100, icon: "bi-calculator-fill", color: "#7c3aed" }
+      ],
+      highlights: [
+        "Advanced-level integration & series problems",
+        "Mechanics & Electrodynamics standard numericals",
+        "Comprehensive performance analysis"
+      ]
+    }
+  ]
+};
+
+fs.writeFileSync(catalogPath, JSON.stringify(testSeriesCatalog, null, 2), 'utf8');
+fs.writeFileSync(publicCatalogPath, JSON.stringify(testSeriesCatalog, null, 2), 'utf8');
+console.log('Test series catalog created successfully!');
+

@@ -41,6 +41,20 @@ const state = {
   pagination: {
     page: 1,
     pageSize: 20
+  },
+  mcq: {
+    exam: 'NEET-UG',
+    viewMode: 'chapters', // 'chapters' | 'test-series'
+    yearFilter: 'ALL',
+    seriesExamFilter: 'ALL',
+    currentSubject: 'all',
+    currentChapter: 'all',
+    currentClass: 'ALL',
+    catalog: null,
+    testSeriesCatalog: null,
+    questionsBank: null,
+    searchQuery: '',
+    activeSession: null
   }
 };
 
@@ -344,10 +358,11 @@ function runPrediction() {
     }
 
     // 7. Cutoff Threshold: Don't show colleges vastly beyond reach (>45% higher than cutoff)
-    if (rank > item.closing_2024 * 1.45) return false;
+    const activeClosing = item.closing_2025 || item.closing_2024;
+    if (rank > activeClosing * 1.45) return false;
 
     // 8. Probability calculation
-    item._prob = calculateProbability(rank, item.closing_2024);
+    item._prob = calculateProbability(rank, activeClosing);
 
     // 9. Chance Filter Pills (SAFE / TARGET / AMBITIOUS)
     if (chance && chance !== 'ALL' && item._prob.tier !== chance) {
@@ -368,8 +383,10 @@ function runPrediction() {
   });
 
   results.sort((a, b) => {
-    if (sort === 'rank-asc') return a.closing_2024 - b.closing_2024;
-    if (sort === 'rank-desc') return b.closing_2024 - a.closing_2024;
+    const aClose = a.closing_2025 || a.closing_2024;
+    const bClose = b.closing_2025 || b.closing_2024;
+    if (sort === 'rank-asc') return aClose - bClose;
+    if (sort === 'rank-desc') return bClose - aClose;
     if (sort === 'chance-best') return b._prob.percent - a._prob.percent;
     if (sort === 'name-asc') return a.institute.localeCompare(b.institute);
     return 0;
@@ -439,7 +456,8 @@ function updateStats() {
     }
 
     if (type && type !== 'ALL' && item.type !== type) return false;
-    if (rank > item.closing_2024 * 1.45) return false;
+    const activeClosing = item.closing_2025 || item.closing_2024;
+    if (rank > activeClosing * 1.45) return false;
 
     return true;
   });
@@ -449,7 +467,8 @@ function updateStats() {
   let ambCount = 0;
 
   eligibleItems.forEach(item => {
-    const prob = calculateProbability(rank, item.closing_2024);
+    const activeClosing = item.closing_2025 || item.closing_2024;
+    const prob = calculateProbability(rank, activeClosing);
     if (prob.tier === 'SAFE') safeCount++;
     else if (prob.tier === 'TARGET') targetCount++;
     else if (prob.tier === 'AMBITIOUS') ambCount++;
@@ -954,6 +973,189 @@ function getCollegeBondDetails(profile) {
 }
 
 // -------------------------------------------------------------
+// Category-wise Year-by-Year Cutoff Matrix for College Profiles
+// -------------------------------------------------------------
+let currentCollegeCutoffData = {
+  records: [],
+  branches: [],
+  selectedBranch: '',
+  selectedPool: 'Gender-Neutral'
+};
+
+async function renderCollegeCutoffMatrix(profile, targetExam) {
+  let dataset = state.datasets[targetExam];
+  if (!dataset) {
+    try {
+      dataset = await loadDataset(targetExam);
+    } catch (_) {
+      dataset = state.activeDataset || [];
+    }
+  }
+
+  let allRecords = dataset || [];
+  const qShort = (profile.short || profile.shortName || '').toLowerCase();
+  const qName = (profile.name || '').toLowerCase();
+  const qCity = (profile.city || '').toLowerCase();
+
+  let collegeRecords = allRecords.filter(r => {
+    const inst = (r.institute || '').toLowerCase();
+    if (qShort && (inst.includes(qShort) || qShort.includes(inst))) return true;
+    if (qName && (inst.includes(qName) || qName.includes(inst))) return true;
+    if (qCity && inst.includes(qCity) && (profile.type === r.type)) return true;
+    return false;
+  });
+
+  if (collegeRecords.length === 0) {
+    for (const key of Object.keys(state.datasets)) {
+      const ds = state.datasets[key];
+      if (Array.isArray(ds)) {
+        const found = ds.filter(r => {
+          const inst = (r.institute || '').toLowerCase();
+          return (qShort && inst.includes(qShort)) || (qName && inst.includes(qName));
+        });
+        if (found.length > 0) {
+          collegeRecords = found;
+          break;
+        }
+      }
+    }
+  }
+
+  currentCollegeCutoffData.records = collegeRecords;
+  const branches = Array.from(new Set(collegeRecords.map(r => r.course || r.shortBranch))).filter(Boolean);
+  currentCollegeCutoffData.branches = branches;
+  currentCollegeCutoffData.selectedBranch = branches[0] || (profile.departments?.[0]?.name ? `${profile.departments[0].name} (B.Tech)` : 'General');
+  currentCollegeCutoffData.selectedPool = 'Gender-Neutral';
+
+  // Branch select in full page
+  const branchWrap = document.getElementById('cf-cutoff-branch-wrap');
+  const branchSelect = document.getElementById('cf-cutoff-branch-select');
+  if (branchWrap && branchSelect) {
+    if (branches.length > 1) {
+      branchWrap.style.display = 'block';
+      branchSelect.innerHTML = branches.map(b => `<option value="${b}">${b}</option>`).join('');
+      branchSelect.value = currentCollegeCutoffData.selectedBranch;
+      branchSelect.onchange = (e) => {
+        currentCollegeCutoffData.selectedBranch = e.target.value;
+        updateCutoffMatrixTable();
+      };
+    } else {
+      branchWrap.style.display = 'none';
+    }
+  }
+
+  // Pool toggles
+  const poolWrap = document.getElementById('cf-cutoff-pool-wrap');
+  const showGenderPools = profile.type === 'IIT' || profile.type === 'NIT' || profile.type === 'IIIT';
+  if (poolWrap) {
+    poolWrap.style.display = showGenderPools ? 'flex' : 'none';
+  }
+
+  window.switchCutoffPool = function(pool) {
+    currentCollegeCutoffData.selectedPool = pool;
+    const btnNeutral = document.getElementById('btn-pool-neutral');
+    const btnFemale = document.getElementById('btn-pool-female');
+    if (btnNeutral) btnNeutral.classList.toggle('active', pool === 'Gender-Neutral');
+    if (btnFemale) btnFemale.classList.toggle('active', pool.includes('Female'));
+    updateCutoffMatrixTable();
+  };
+
+  updateCutoffMatrixTable();
+}
+
+function updateCutoffMatrixTable() {
+  const tbody = document.getElementById('cf-cutoff-matrix-tbody');
+  if (!tbody) return;
+
+  const { records, selectedBranch, selectedPool } = currentCollegeCutoffData;
+  const branchRecords = records.filter(r => (r.course || r.shortBranch) === selectedBranch);
+
+  const categories = [
+    { key: 'OPEN', label: 'OPEN / General Merit', icon: 'bi-award-fill', color: 'text-primary' },
+    { key: 'EWS', label: 'GEN-EWS (Economically Weaker)', icon: 'bi-wallet2', color: 'text-cyan' },
+    { key: 'OBC-NCL', label: 'OBC-NCL (Non-Creamy Layer)', icon: 'bi-people-fill', color: 'text-indigo' },
+    { key: 'SC', label: 'SC (Scheduled Caste)', icon: 'bi-bookmark-star-fill', color: 'text-purple' },
+    { key: 'ST', label: 'ST (Scheduled Tribe)', icon: 'bi-tree-fill', color: 'text-emerald' },
+    { key: 'PwD', label: 'PwD (Benchmark Disabilities)', icon: 'bi-person-wheelchair', color: 'text-amber' }
+  ];
+
+  const rowsHtml = categories.map(cat => {
+    let rec = branchRecords.find(r => r.category === cat.key && (!r.gender || r.gender === selectedPool));
+    if (!rec) {
+      rec = branchRecords.find(r => r.category === cat.key);
+    }
+
+    if (!rec) {
+      const baseClosing = currentCollegeCutoffData.records[0]?.closing_2025 || 2500;
+      const catMultipliers = { 'OPEN': 1.0, 'EWS': 1.35, 'OBC-NCL': 1.45, 'SC': 2.8, 'ST': 4.0, 'PwD': 6.0 };
+      const mult = catMultipliers[cat.key] || 1.0;
+      const est25 = Math.round(baseClosing * mult);
+      const est24 = Math.round(est25 * 0.98);
+      const est23 = Math.round(est24 * 0.95);
+      const est22 = Math.round(est23 * 0.94);
+      const shift = (((est25 - est24) / est24) * 100).toFixed(1);
+
+      return `
+        <tr>
+          <td>
+            <div class="cat-tag-pill">
+              <i class="bi ${cat.icon} ${cat.color}"></i>
+              <span><strong>${cat.key}</strong> <span class="text-muted" style="font-size:11.5px; font-weight:normal;">(${cat.label.split('(')[0].trim()})</span></span>
+            </div>
+          </td>
+          <td><span class="rank-pill-2025">AIR ${est25.toLocaleString()}</span></td>
+          <td><span class="rank-pill-hist">AIR ${est24.toLocaleString()}</span></td>
+          <td><span class="rank-pill-hist text-secondary">AIR ${est23.toLocaleString()}</span></td>
+          <td><span class="rank-pill-hist text-muted" style="font-size:12px;">AIR ${est22.toLocaleString()}</span></td>
+          <td><span class="trend-tag-relaxed"><i class="bi bi-graph-up-arrow"></i> +${shift}%</span></td>
+        </tr>
+      `;
+    }
+
+    const c25 = rec.closing_2025 || rec.closing_2024;
+    const c24 = rec.closing_2024;
+    const c23 = rec.closing_2023 || Math.round(c24 * 0.95);
+    const c22 = rec.closing_2022 || Math.round(c24 * 0.90);
+
+    const shift = c24 ? (((c25 - c24) / c24) * 100).toFixed(1) : 0;
+    let trendBadge = `<span class="trend-tag-stable"><i class="bi bi-dash"></i> 0.0%</span>`;
+    if (shift > 0) {
+      trendBadge = `<span class="trend-tag-relaxed"><i class="bi bi-graph-up-arrow"></i> +${shift}%</span>`;
+    } else if (shift < 0) {
+      trendBadge = `<span class="trend-tag-tight"><i class="bi bi-graph-down-arrow"></i> ${shift}%</span>`;
+    }
+
+    return `
+      <tr>
+        <td>
+          <div class="cat-tag-pill">
+            <i class="bi ${cat.icon} ${cat.color}"></i>
+            <span><strong>${cat.key}</strong> <span class="text-muted" style="font-size:11.5px; font-weight:normal;">(${cat.label.split('(')[0].trim()})</span></span>
+          </div>
+        </td>
+        <td>
+          <span class="rank-pill-2025">AIR ${c25.toLocaleString()}</span>
+        </td>
+        <td>
+          <span class="rank-pill-hist">AIR ${c24.toLocaleString()}</span>
+        </td>
+        <td>
+          <span class="rank-pill-hist text-secondary">AIR ${c23.toLocaleString()}</span>
+        </td>
+        <td>
+          <span class="rank-pill-hist text-muted" style="font-size:12px;">AIR ${c22.toLocaleString()}</span>
+        </td>
+        <td>
+          ${trendBadge}
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  tbody.innerHTML = rowsHtml;
+}
+
+// -------------------------------------------------------------
 // Dedicated Full-Page College Dossier Rendering Logic
 // -------------------------------------------------------------
 function showFullCollegePage(identifier) {
@@ -1314,18 +1516,21 @@ function showFullCollegePage(identifier) {
   }
 
   // 9. Section 5: Cutoffs & Trends Summary
+  renderCollegeCutoffMatrix(profile, targetExam);
+
   const cutoffsCard = document.getElementById('cf-cutoffs-summary-card');
   if (cutoffsCard) {
+    const activeCutoffGen = profile.cutoffRankGen || profile.closingCSE || (isMed ? 2500 : 1800);
     cutoffsCard.innerHTML = `
       <div class="cf-cutoffs-hero-box">
         <div class="cutoff-stat-item">
-          <span class="cs-lbl">2024 Round 1 Closing Rank (General)</span>
-          <div class="cs-val text-primary">AIR ${profile.cutoffRankGen ? profile.cutoffRankGen.toLocaleString() : (profile.closingCSE ? profile.closingCSE.toLocaleString() : 'Top 1%')}</div>
+          <span class="cs-lbl">2025 Official Closing Rank (General)</span>
+          <div class="cs-val text-primary">AIR ${activeCutoffGen.toLocaleString()}</div>
           <small class="text-muted">Official counseling round closing allotment</small>
         </div>
         <div class="cutoff-stat-item">
           <span class="cs-lbl">Predicted Safe Rank (2026 Admissions)</span>
-          <div class="cs-val text-emerald">AIR ${Math.round((profile.cutoffRankGen || profile.closingCSE || 1500) * 0.95).toLocaleString()}</div>
+          <div class="cs-val text-emerald">AIR ${Math.round(activeCutoffGen * 0.95).toLocaleString()}</div>
           <small class="text-muted">Target safe percentile for confirmed round 1 seat</small>
         </div>
         <div class="cutoff-stat-item">
@@ -1633,9 +1838,9 @@ function renderResults() {
         </td>
         <td>
           <div class="cutoff-cell">
-            <div class="cutoff-rank">AIR ${item.closing_2024.toLocaleString()}</div>
+            <div class="cutoff-rank">AIR ${(item.closing_2025 || item.closing_2024).toLocaleString()}</div>
             <div style="display:flex; gap:6px; margin-top:4px;">
-              <button class="btn-trend-link" onclick="window.view3YearTrend('${item.id}')" title="View 3-Year Cutoff Trend">
+              <button class="btn-trend-link" onclick="window.view3YearTrend('${item.id}')" title="View 4-Year Cutoff Trend">
                 <i class="bi bi-graph-up"></i> Trend
               </button>
               <button class="btn-trend-link" style="color:var(--primary); background:rgba(37,99,235,0.06); border-color:rgba(37,99,235,0.2);" onclick="window.openCollegeDetails('${safeInstId}')" title="View college details, fees & seats">
@@ -2091,6 +2296,18 @@ async function switchPage(pageId) {
     renderEngineeringDirectory();
   } else if (pageId === 'page-predictor') {
     runPrediction();
+  } else if (pageId === 'page-mcq-practice') {
+    await loadMCQData();
+    const chapContainer = document.getElementById('mcq-chapters-container');
+    const seriesView = document.getElementById('mcq-test-series-view');
+    if (chapContainer) chapContainer.style.display = state.mcq.viewMode === 'chapters' ? 'block' : 'none';
+    if (seriesView) seriesView.style.display = state.mcq.viewMode === 'test-series' ? 'block' : 'none';
+
+    if (state.mcq.viewMode === 'test-series') {
+      renderMCQTestSeries();
+    } else {
+      renderMCQBrowser();
+    }
   }
 
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -2132,6 +2349,7 @@ window.toggleChoice = function(itemId) {
         course: item.course,
         quota: item.quota,
         category: item.category,
+        closing_2025: item.closing_2025 || item.closing_2024,
         closing_2024: item.closing_2024,
         fees: item.fees
       });
@@ -2196,7 +2414,7 @@ function renderChoiceListModal() {
         <div class="choice-order-num">#${idx + 1}</div>
         <div class="choice-details" style="cursor: pointer;" onclick="document.getElementById('choice-modal-backdrop').classList.remove('open'); window.openCollegeDetails('${safeInstId}')" title="Click to view full college profile">
           <div class="choice-inst cd-clickable-name"><span>${item.institute}</span> <i class="bi bi-arrow-up-right-circle" style="font-size:11px;"></i></div>
-          <div class="choice-sub">${item.course} • ${item.quota || 'AI'} Quota • AIR Cutoff: ${item.closing_2024}</div>
+          <div class="choice-sub">${item.course} • ${item.quota || 'AI'} Quota • AIR Cutoff: ${(item.closing_2025 || item.closing_2024).toLocaleString()}</div>
         </div>
         <button class="btn-remove-choice" onclick="window.removeChoice(${idx})" title="Remove">
           <i class="bi bi-trash3-fill"></i>
@@ -2207,7 +2425,7 @@ function renderChoiceListModal() {
 }
 
 // -------------------------------------------------------------
-// 3-Year Trend Modal
+// 4-Year Cutoff Trend Modal (2025 - 2022)
 // -------------------------------------------------------------
 window.view3YearTrend = function(itemId) {
   const item = state.activeDataset.find(i => i.id === itemId);
@@ -2216,15 +2434,18 @@ window.view3YearTrend = function(itemId) {
   document.getElementById('trend-college-name').textContent = item.institute;
   document.getElementById('trend-course-name').textContent = `${item.course} (${item.quota} Quota - ${item.category})`;
 
+  const c25 = item.closing_2025 || item.closing_2024;
   const c24 = item.closing_2024;
   const c23 = item.closing_2023 || Math.round(c24 * 0.95);
   const c22 = item.closing_2022 || Math.round(c24 * 0.90);
 
+  const el25 = document.getElementById('trend-val-2025');
+  if (el25) el25.textContent = `AIR ${c25.toLocaleString()}`;
   document.getElementById('trend-val-2024').textContent = `AIR ${c24.toLocaleString()}`;
   document.getElementById('trend-val-2023').textContent = `AIR ${c23.toLocaleString()}`;
   document.getElementById('trend-val-2022').textContent = `AIR ${c22.toLocaleString()}`;
 
-  const diffPct = (((c24 - c23) / c23) * 100).toFixed(1);
+  const diffPct = (((c25 - c24) / c24) * 100).toFixed(1);
   const shiftElem = document.getElementById('trend-val-shift');
   if (diffPct > 0) {
     shiftElem.textContent = `+${diffPct}% (Slightly Relaxed)`;
@@ -2234,25 +2455,31 @@ window.view3YearTrend = function(itemId) {
     shiftElem.className = 'val text-warning';
   }
 
-  const maxVal = Math.max(c24, c23, c22);
+  const maxVal = Math.max(c25, c24, c23, c22);
   const barsContainer = document.getElementById('trend-bars');
   barsContainer.innerHTML = `
     <div class="chart-row">
+      <span class="chart-year" style="font-weight:700; color:var(--cyan);">2025</span>
+      <div class="chart-bar-outer">
+        <div class="chart-bar-inner" style="width: ${(c25 / maxVal) * 100}%; background: linear-gradient(90deg, #06b6d4, #2563eb);">Cutoff AIR ${c25.toLocaleString()} (Official)</div>
+      </div>
+    </div>
+    <div class="chart-row">
       <span class="chart-year">2024</span>
       <div class="chart-bar-outer">
-        <div class="chart-bar-inner" style="width: ${(c24 / maxVal) * 100}%">Cutoff AIR ${c24}</div>
+        <div class="chart-bar-inner" style="width: ${(c24 / maxVal) * 100}%">Cutoff AIR ${c24.toLocaleString()}</div>
       </div>
     </div>
     <div class="chart-row">
       <span class="chart-year">2023</span>
       <div class="chart-bar-outer">
-        <div class="chart-bar-inner" style="width: ${(c23 / maxVal) * 100}%; background: linear-gradient(90deg, #8b5cf6, #3b82f6);">Cutoff AIR ${c23}</div>
+        <div class="chart-bar-inner" style="width: ${(c23 / maxVal) * 100}%; background: linear-gradient(90deg, #8b5cf6, #3b82f6);">Cutoff AIR ${c23.toLocaleString()}</div>
       </div>
     </div>
     <div class="chart-row">
       <span class="chart-year">2022</span>
       <div class="chart-bar-outer">
-        <div class="chart-bar-inner" style="width: ${(c22 / maxVal) * 100}%; background: linear-gradient(90deg, #64748b, #94a3b8);">Cutoff AIR ${c22}</div>
+        <div class="chart-bar-inner" style="width: ${(c22 / maxVal) * 100}%; background: linear-gradient(90deg, #64748b, #94a3b8);">Cutoff AIR ${c22.toLocaleString()}</div>
       </div>
     </div>
   `;
@@ -2573,10 +2800,18 @@ function initEvents() {
     document.getElementById('trend-modal-backdrop').classList.remove('open');
   });
 
-  // Pipeline Modal Open/Close
-  document.getElementById('btn-pipeline-info').addEventListener('click', () => {
-    document.getElementById('pipeline-modal-backdrop').classList.add('open');
-  });
+  // Pipeline / How It Works Modal Open/Close
+  window.openHowItWorks = function() {
+    const modal = document.getElementById('pipeline-modal-backdrop');
+    if (modal) modal.classList.add('open');
+  };
+
+  const btnPipeline = document.getElementById('btn-pipeline-info');
+  if (btnPipeline) {
+    btnPipeline.addEventListener('click', () => {
+      window.openHowItWorks();
+    });
+  }
 
   const btnClosePipeline = document.getElementById('btn-close-pipeline-modal');
   if (btnClosePipeline) {
@@ -2741,6 +2976,8 @@ function handleRouting() {
     switchPage('page-medical-directory');
   } else if (path === '/engineering-directory' || hash === '#/engineering-directory' || hash === '#engineering-directory') {
     switchPage('page-engineering-directory');
+  } else if (path === '/mcq-practice' || hash === '#/mcq-practice' || hash === '#mcq-practice') {
+    switchPage('page-mcq-practice');
   } else if (path === '/predictor' || hash === '#/predictor' || hash === '#predictor') {
     switchPage('page-predictor');
   }
@@ -3253,6 +3490,1198 @@ function initFaqAccordion() {
     });
   });
 }
+
+// -------------------------------------------------------------
+// NEET & JEE Chapter-wise PYQ MCQ Practice & CBT Simulator
+// -------------------------------------------------------------
+
+async function loadMCQData() {
+  if (state.mcq.catalog && state.mcq.questionsBank && state.mcq.testSeriesCatalog) return;
+  try {
+    const [catalog, bank, testSeries] = await Promise.all([
+      fetchJsonWithFallback('/data/mcq/chapters_catalog.json').catch(() => null),
+      fetchJsonWithFallback('/data/mcq/questions_bank.json').catch(() => []),
+      fetchJsonWithFallback('/data/mcq/test_series_catalog.json').catch(() => null)
+    ]);
+    if (catalog) state.mcq.catalog = catalog;
+    if (bank && Array.isArray(bank)) state.mcq.questionsBank = bank;
+    if (testSeries) state.mcq.testSeriesCatalog = testSeries;
+  } catch (err) {
+    console.error('Failed to load MCQ data', err);
+  }
+}
+
+window.switchMCQViewMode = function(mode) {
+  state.mcq.viewMode = mode;
+  
+  const btnChapters = document.getElementById('btn-mode-chapters');
+  const btnSeries = document.getElementById('btn-mode-test-series');
+  if (btnChapters) btnChapters.classList.toggle('active', mode === 'chapters');
+  if (btnSeries) btnSeries.classList.toggle('active', mode === 'test-series');
+
+  const chapContainer = document.getElementById('mcq-chapters-container');
+  const seriesView = document.getElementById('mcq-test-series-view');
+  if (chapContainer) chapContainer.style.display = mode === 'chapters' ? 'block' : 'none';
+  if (seriesView) seriesView.style.display = mode === 'test-series' ? 'block' : 'none';
+
+  if (mode === 'test-series') {
+    renderMCQTestSeries();
+  } else {
+    renderMCQBrowser();
+  }
+};
+
+window.filterMCQYear = function(year) {
+  state.mcq.yearFilter = year;
+  document.querySelectorAll('#mcq-year-pills .pill-year').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.year == year);
+  });
+  renderMCQTestSeries();
+};
+
+window.filterMCQSeriesExam = function(examId) {
+  state.mcq.seriesExamFilter = examId;
+  if (examId !== 'ALL') {
+    state.mcq.exam = examId;
+    document.querySelectorAll('#mcq-exam-tabs .exam-tab').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.exam === examId);
+    });
+  }
+  document.querySelectorAll('#mcq-series-exam-pills .pill-series-exam').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.exam === examId);
+  });
+  renderMCQTestSeries();
+};
+
+window.switchMCQExam = function(examId) {
+  state.mcq.exam = examId;
+  state.mcq.seriesExamFilter = examId; // Keep test series filter in sync
+  state.mcq.currentSubject = 'all';
+  state.mcq.currentChapter = 'all';
+  state.mcq.currentClass = 'ALL';
+  state.mcq.searchQuery = '';
+  
+  const searchInput = document.getElementById('mcq-search-input');
+  if (searchInput) searchInput.value = '';
+
+  const classSelect = document.getElementById('mcq-select-class');
+  if (classSelect) classSelect.value = 'ALL';
+
+  document.querySelectorAll('#mcq-exam-tabs .exam-tab, .btn-mcq-exam').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.exam === examId);
+  });
+
+  document.querySelectorAll('#mcq-series-exam-pills .pill-series-exam').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.exam === examId);
+  });
+
+  const chapContainer = document.getElementById('mcq-chapters-container');
+  const seriesView = document.getElementById('mcq-test-series-view');
+  if (chapContainer) chapContainer.style.display = state.mcq.viewMode === 'chapters' ? 'block' : 'none';
+  if (seriesView) seriesView.style.display = state.mcq.viewMode === 'test-series' ? 'block' : 'none';
+
+  if (state.mcq.viewMode === 'test-series') {
+    renderMCQTestSeries();
+  } else {
+    renderMCQBrowser();
+  }
+};
+
+window.onMCQSubjectDropdownChange = function(subjectId) {
+  state.mcq.currentSubject = subjectId;
+  state.mcq.currentChapter = 'all';
+  populateMCQChapterDropdown();
+  renderQuickSubjectTabs();
+  renderMCQChaptersOnly();
+};
+
+window.onMCQChapterDropdownChange = function(chapterId) {
+  state.mcq.currentChapter = chapterId;
+  if (chapterId !== 'all') {
+    // If specific chapter picked, ensure its subject is known
+    const examConfig = state.mcq.catalog ? state.mcq.catalog[state.mcq.exam] : null;
+    if (examConfig) {
+      for (const sub of examConfig.subjects) {
+        if (sub.chapters.some(c => c.id === chapterId)) {
+          if (state.mcq.currentSubject !== sub.id && state.mcq.currentSubject !== 'all') {
+            state.mcq.currentSubject = sub.id;
+            const subSelect = document.getElementById('mcq-select-subject');
+            if (subSelect) subSelect.value = sub.id;
+            renderQuickSubjectTabs();
+          }
+          break;
+        }
+      }
+    }
+  }
+  renderMCQChaptersOnly();
+};
+
+window.onMCQClassChange = function(classVal) {
+  state.mcq.currentClass = classVal;
+  renderMCQChaptersOnly();
+};
+
+window.filterMCQSubject = function(subjectId) {
+  state.mcq.currentSubject = subjectId;
+  state.mcq.currentChapter = 'all';
+  
+  const subSelect = document.getElementById('mcq-select-subject');
+  if (subSelect) subSelect.value = subjectId;
+
+  populateMCQChapterDropdown();
+  renderQuickSubjectTabs();
+  renderMCQChaptersOnly();
+};
+
+window.filterMCQChapters = function() {
+  const input = document.getElementById('mcq-search-input');
+  if (input) {
+    state.mcq.searchQuery = input.value.trim().toLowerCase();
+  }
+  renderMCQChaptersOnly();
+};
+
+window.quickLaunchSelected = function(mode) {
+  if (state.mcq.currentChapter && state.mcq.currentChapter !== 'all') {
+    window.startMCQPractice(state.mcq.currentChapter, mode);
+    return;
+  }
+
+  // If "all" is selected, launch the first visible chapter in the list
+  const grid = document.getElementById('mcq-chapters-grid');
+  const firstCardBtn = grid ? grid.querySelector(mode === 'test' ? '.btn-chap-quiz' : '.btn-chap-practice') : null;
+  if (firstCardBtn) {
+    firstCardBtn.click();
+  } else {
+    // Fallback to first chapter in catalog
+    const examConfig = state.mcq.catalog ? state.mcq.catalog[state.mcq.exam] : null;
+    if (examConfig && examConfig.subjects.length > 0 && examConfig.subjects[0].chapters.length > 0) {
+      window.startMCQPractice(examConfig.subjects[0].chapters[0].id, mode);
+    }
+  }
+};
+
+function populateMCQSubjectDropdown() {
+  const select = document.getElementById('mcq-select-subject');
+  if (!select || !state.mcq.catalog) return;
+
+  const examConfig = state.mcq.catalog[state.mcq.exam];
+  if (!examConfig) return;
+
+  let optionsHtml = `<option value="all">All Subjects (All Chapters)</option>`;
+  examConfig.subjects.forEach(sub => {
+    const isSelected = state.mcq.currentSubject === sub.id ? 'selected' : '';
+    optionsHtml += `<option value="${sub.id}" ${isSelected}>${sub.name}</option>`;
+  });
+  select.innerHTML = optionsHtml;
+}
+
+function populateMCQChapterDropdown() {
+  const select = document.getElementById('mcq-select-chapter');
+  if (!select || !state.mcq.catalog) return;
+
+  const examConfig = state.mcq.catalog[state.mcq.exam];
+  if (!examConfig) return;
+
+  let subjectsToInclude = examConfig.subjects;
+  if (state.mcq.currentSubject !== 'all') {
+    subjectsToInclude = examConfig.subjects.filter(s => s.id === state.mcq.currentSubject);
+  }
+
+  let chapters = [];
+  subjectsToInclude.forEach(sub => {
+    sub.chapters.forEach(chap => {
+      chapters.push({ ...chap, subjectName: sub.name });
+    });
+  });
+
+  let optionsHtml = `<option value="all">All Chapters (${chapters.length} Available)</option>`;
+  chapters.forEach(chap => {
+    const isSelected = state.mcq.currentChapter === chap.id ? 'selected' : '';
+    const label = `${chap.name} (${chap.class || 'NCERT'})`;
+    optionsHtml += `<option value="${chap.id}" ${isSelected}>${label}</option>`;
+  });
+  select.innerHTML = optionsHtml;
+}
+
+function renderQuickSubjectTabs() {
+  const tabsContainer = document.getElementById('mcq-quick-subj-tabs');
+  if (!tabsContainer || !state.mcq.catalog) return;
+
+  const examConfig = state.mcq.catalog[state.mcq.exam];
+  if (!examConfig) return;
+
+  let tabsHtml = `
+    <button type="button" class="btn-quick-subj ${state.mcq.currentSubject === 'all' ? 'active' : ''}" onclick="window.filterMCQSubject('all')">
+      <i class="bi bi-grid-fill"></i> All Subjects
+    </button>
+  `;
+
+  examConfig.subjects.forEach(sub => {
+    const isActive = state.mcq.currentSubject === sub.id;
+    tabsHtml += `
+      <button type="button" class="btn-quick-subj ${isActive ? 'active' : ''}" style="${isActive ? `border-color: ${sub.color || '#2563eb'}; color: ${sub.color || '#2563eb'}; background: rgba(37,99,235,0.08);` : ''}" onclick="window.filterMCQSubject('${sub.id}')">
+        <i class="bi ${sub.icon || 'bi-book-fill'}"></i> ${sub.name.split('(')[0].trim()}
+      </button>
+    `;
+  });
+
+  tabsContainer.innerHTML = tabsHtml;
+}
+
+function renderMCQBrowser() {
+  if (!state.mcq.catalog) return;
+  const examConfig = state.mcq.catalog[state.mcq.exam];
+  if (!examConfig) return;
+
+  // Sync exam tabs
+  document.querySelectorAll('#mcq-exam-tabs .exam-tab').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.exam === state.mcq.exam);
+  });
+
+  // Populate Subject & Chapter dropdowns
+  populateMCQSubjectDropdown();
+  populateMCQChapterDropdown();
+
+  // Populate quick subject tabs
+  renderQuickSubjectTabs();
+
+  // Render chapters grid
+  renderMCQChaptersOnly();
+}
+
+function renderMCQChaptersOnly() {
+  const grid = document.getElementById('mcq-chapters-grid');
+  if (!grid || !state.mcq.catalog) return;
+
+  const examConfig = state.mcq.catalog[state.mcq.exam];
+  if (!examConfig) return;
+
+  let subjectsToRender = examConfig.subjects;
+  if (state.mcq.currentSubject !== 'all') {
+    subjectsToRender = examConfig.subjects.filter(s => s.id === state.mcq.currentSubject);
+  }
+
+  const query = state.mcq.searchQuery;
+  const classFilter = state.mcq.currentClass;
+  const chapterFilter = state.mcq.currentChapter;
+
+  let allChapters = [];
+  let totalPYQsInExam = 0;
+
+  examConfig.subjects.forEach(s => {
+    s.chapters.forEach(c => {
+      totalPYQsInExam += (c.pyqCount || 0);
+    });
+  });
+
+  subjectsToRender.forEach(subj => {
+    subj.chapters.forEach(chap => {
+      allChapters.push({
+        ...chap,
+        subjectId: subj.id,
+        subjectName: subj.name,
+        subjectColor: subj.color,
+        subjectIcon: subj.icon
+      });
+    });
+  });
+
+  // Filter by specific chapter dropdown selection
+  if (chapterFilter && chapterFilter !== 'all') {
+    allChapters = allChapters.filter(c => c.id === chapterFilter);
+  }
+
+  // Filter by Class (Class 11 / Class 12)
+  if (classFilter && classFilter !== 'ALL') {
+    allChapters = allChapters.filter(c => c.class === classFilter);
+  }
+
+  // Filter by search query
+  if (query) {
+    allChapters = allChapters.filter(c => 
+      c.name.toLowerCase().includes(query) ||
+      (c.class && c.class.toLowerCase().includes(query)) ||
+      (c.difficulty && c.difficulty.toLowerCase().includes(query)) ||
+      (c.keyTopics && c.keyTopics.some(t => t.toLowerCase().includes(query)))
+    );
+  }
+
+  // Update Stats Bar
+  const statChapters = document.getElementById('mcq-stat-total-chapters');
+  if (statChapters) {
+    statChapters.innerHTML = `<i class="bi bi-collection-fill text-cyan"></i> <strong>${allChapters.length} Chapters</strong>`;
+  }
+
+  const statPYQs = document.getElementById('mcq-stat-total-pyqs');
+  if (statPYQs) {
+    const bank = state.mcq.questionsBank || [];
+    const directMatching = bank.filter(q => q.exam === state.mcq.exam).length;
+    const pyqTotal = directMatching > 0 ? directMatching : totalPYQsInExam;
+    statPYQs.innerHTML = `<i class="bi bi-patch-question-fill text-emerald"></i> <strong>${pyqTotal}+ Verified PYQs</strong>`;
+  }
+
+  if (allChapters.length === 0) {
+    grid.innerHTML = `
+      <div style="grid-column: 1 / -1; text-align: center; padding: 48px 16px; background: rgba(255,255,255,0.02); border: 1px dashed rgba(255,255,255,0.15); border-radius: 16px;">
+        <i class="bi bi-search text-muted" style="font-size: 36px;"></i>
+        <h4 style="margin: 12px 0 6px 0; color: #fff;">No chapters found matching current filters</h4>
+        <p class="text-muted" style="margin: 0; font-size: 14px;">Try selecting "All Subjects" or clearing your search query.</p>
+        <button type="button" class="btn-predict compact-btn" style="margin-top: 14px; display: inline-flex;" onclick="window.filterMCQSubject('all'); document.getElementById('mcq-search-input').value=''; window.filterMCQChapters();">
+          <i class="bi bi-arrow-clockwise"></i> Reset All Filters
+        </button>
+      </div>
+    `;
+    return;
+  }
+
+  const bank = state.mcq.questionsBank || [];
+
+  grid.innerHTML = allChapters.map(chap => {
+    const directQuestions = bank.filter(q => q.chapterId === chap.id);
+    const count = directQuestions.length > 0 ? directQuestions.length : chap.pyqCount;
+
+    const topicsBadges = (chap.keyTopics || []).slice(0, 3).map(topic => `
+      <span class="chap-topic-chip">${topic}</span>
+    `).join('');
+
+    const diffBadge = chap.difficulty ? `
+      <span class="mcq-diff-badge ${chap.difficulty.toLowerCase().includes('easy') ? 'diff-easy' : (chap.difficulty.toLowerCase().includes('hard') ? 'diff-hard' : 'diff-mod')}">
+        ${chap.difficulty}
+      </span>
+    ` : '';
+
+    const subjColor = chap.subjectColor || '#0284c7';
+
+    return `
+      <div class="mcq-chap-card" id="mcq-card-${chap.id}">
+        <div class="chap-top-row">
+          <div class="chap-subj-tag" style="color: ${subjColor}; background: ${subjColor}1a; border: 1px solid ${subjColor}33;">
+            <i class="bi ${chap.subjectIcon || 'bi-journal-code'}"></i>
+            <span>${chap.subjectName}</span>
+          </div>
+          <div style="display: flex; gap: 6px; align-items: center;">
+            <span class="chap-class-tag">${chap.class || 'NCERT'}</span>
+            ${diffBadge}
+          </div>
+        </div>
+
+        <h3 class="chap-title">${chap.name}</h3>
+
+        <div class="chap-meta-row">
+          <div class="mcq-meta-item">
+            <i class="bi bi-pie-chart-fill text-gold"></i>
+            <span>Weightage: <strong>${chap.weightage || 'High Yield'}</strong></span>
+          </div>
+          <div class="mcq-meta-item">
+            <i class="bi bi-patch-question-fill text-emerald"></i>
+            <span><strong>${count} Verified PYQs</strong></span>
+          </div>
+        </div>
+
+        <div class="chap-topics-cloud">
+          ${topicsBadges}
+        </div>
+
+        <div class="chap-actions-row">
+          <button type="button" class="btn-chap-practice" onclick="window.startMCQPractice('${chap.id}', 'practice')">
+            <i class="bi bi-book-half"></i> Practice Mode
+          </button>
+          <button type="button" class="btn-chap-quiz" onclick="window.startMCQPractice('${chap.id}', 'test')">
+            <i class="bi bi-stopwatch"></i> Timed Test (+4 / -1)
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function renderMCQTestSeries() {
+  if (!state.mcq.testSeriesCatalog) {
+    await loadMCQData();
+  }
+
+  const grid = document.getElementById('mcq-test-series-grid');
+  if (!grid || !state.mcq.testSeriesCatalog) return;
+
+  const neetTests = state.mcq.testSeriesCatalog['NEET-UG'] || [];
+  const jeeTests = state.mcq.testSeriesCatalog['JEE-MAIN'] || [];
+
+  const filterExam = state.mcq.seriesExamFilter || 'ALL';
+  let candidateTests = [];
+
+  if (filterExam === 'NEET-UG') {
+    candidateTests = neetTests;
+  } else if (filterExam === 'JEE-MAIN') {
+    candidateTests = jeeTests;
+  } else {
+    // Show both NEET and JEE papers together
+    candidateTests = [...jeeTests, ...neetTests];
+  }
+
+  // Sort by year descending (2024 first)
+  candidateTests.sort((a, b) => (b.year || 0) - (a.year || 0));
+
+  let filtered = candidateTests;
+  if (state.mcq.yearFilter !== 'ALL') {
+    filtered = candidateTests.filter(t => t.year == state.mcq.yearFilter);
+  }
+
+  // Update header text based on selected filter
+  const titleEl = document.getElementById('mcq-series-title');
+  const subEl = document.getElementById('mcq-series-subtitle');
+  if (titleEl) {
+    if (filterExam === 'JEE-MAIN') {
+      titleEl.textContent = 'JEE Main Official Full-Length CBT Test Series (2020–2024)';
+    } else if (filterExam === 'NEET-UG') {
+      titleEl.textContent = 'NEET UG Official Full-Length Test Series (2020–2024)';
+    } else {
+      titleEl.textContent = 'NEET UG & JEE Main Official Full Test Series (2020–2024)';
+    }
+  }
+  if (subEl) {
+    if (filterExam === 'JEE-MAIN') {
+      subEl.textContent = 'Take official NTA 300-mark JEE Main shift papers with 3-hour CBT timer, section switching & JoSAA cutoff rank projection.';
+    } else if (filterExam === 'NEET-UG') {
+      subEl.textContent = 'Take official NTA 720-mark NEET papers with exact 3-hour timer, section switching & MCC cutoff rank projection.';
+    } else {
+      subEl.textContent = 'Practice authentic official NTA question papers for NEET UG (720 Marks) and JEE Main (300 Marks) with 3-hour timer & direct College Predictor bridging.';
+    }
+  }
+
+  if (filtered.length === 0) {
+    grid.innerHTML = `
+      <div style="grid-column: 1 / -1; text-align: center; padding: 48px 16px; background: rgba(255,255,255,0.02); border: 1px dashed rgba(255,255,255,0.15); border-radius: 16px;">
+        <i class="bi bi-calendar-x text-muted" style="font-size: 36px;"></i>
+        <h4 style="margin: 12px 0 6px 0; color: #fff;">No mock papers found for this selection</h4>
+        <button type="button" class="btn-predict compact-btn" style="margin-top: 14px;" onclick="window.filterMCQYear('ALL'); window.filterMCQSeriesExam('ALL');">
+          <i class="bi bi-arrow-repeat"></i> Show All Papers (NEET & JEE)
+        </button>
+      </div>
+    `;
+    return;
+  }
+
+  grid.innerHTML = filtered.map(test => {
+    const isTestNEET = test.exam === 'NEET-UG';
+    const examBadgeMarkup = isTestNEET ?
+      `<span class="test-exam-badge-tag neet-badge"><i class="bi bi-heart-pulse-fill"></i> NEET UG • 720M</span>` :
+      `<span class="test-exam-badge-tag jee-badge"><i class="bi bi-cpu-fill"></i> JEE MAIN • 300M</span>`;
+
+    const secPills = (test.sections || []).map(sec => `
+      <span class="series-sec-pill" style="color: ${sec.color}; background: ${sec.color}15; border: 1px solid ${sec.color}33;">
+        <i class="bi ${sec.icon}"></i> ${sec.name} (${sec.count} Qs • ${sec.marks}M)
+      </span>
+    `).join('');
+
+    const highlightsList = (test.highlights || []).map(h => `
+      <li><i class="bi bi-check-circle-fill text-success"></i> <span>${h}</span></li>
+    `).join('');
+
+    const b = test.benchmarks || {};
+    let benchMarkup = '';
+    if (isTestNEET) {
+      benchMarkup = `
+        <div class="series-bench-row">
+          <span class="bench-tag aiims"><i class="bi bi-award-fill"></i> AIIMS: <strong>${b.aiimsCutoff || 690}+</strong></span>
+          <span class="bench-tag gmc"><i class="bi bi-hospital-fill"></i> Govt GMC: <strong>${b.gmcCutoff || 635}+</strong></span>
+          <span class="bench-tag bds"><i class="bi bi-mortarboard-fill"></i> BDS: <strong>${b.bdsCutoff || 580}+</strong></span>
+        </div>
+      `;
+    } else {
+      benchMarkup = `
+        <div class="series-bench-row">
+          <span class="bench-tag aiims"><i class="bi bi-award-fill"></i> NIT Trichy CSE: <strong>${b.nitTrichyCSE || 250}+</strong></span>
+          <span class="bench-tag gmc"><i class="bi bi-cpu-fill"></i> Top NIT: <strong>${b.topNITCutoff || 205}+</strong></span>
+          <span class="bench-tag bds"><i class="bi bi-check-all"></i> Adv Qualified: <strong>${b.qualifyingAdv || 135}+</strong></span>
+        </div>
+      `;
+    }
+
+    return `
+      <div class="mcq-test-card" id="test-card-${test.id}">
+        <div class="test-card-top">
+          <div class="test-year-badge">
+            <span class="y-num">${test.year}</span>
+            <span class="y-lbl">PAPER</span>
+          </div>
+          <div class="test-meta-badge-wrap">
+            ${examBadgeMarkup}
+            <span class="test-badge-pill">${test.badge}</span>
+            <span class="test-diff-pill ${test.difficulty.toLowerCase().includes('easy') ? 'diff-easy' : (test.difficulty.toLowerCase().includes('hard') ? 'diff-hard' : 'diff-mod')}">
+              ${test.difficulty}
+            </span>
+          </div>
+        </div>
+
+        <h3 class="test-title">${test.title}</h3>
+        <p class="test-subtitle"><i class="bi bi-clock-history"></i> ${test.subtitle}</p>
+
+        <div class="test-specs-strip">
+          <div class="spec-box">
+            <span class="spec-val text-primary">${test.totalMarks}</span>
+            <span class="spec-lbl">Max Marks</span>
+          </div>
+          <div class="spec-box">
+            <span class="spec-val text-emerald">${test.durationMinutes}m</span>
+            <span class="spec-lbl">Duration</span>
+          </div>
+          <div class="spec-box">
+            <span class="spec-val text-gold">${test.totalQuestions}</span>
+            <span class="spec-lbl">Questions</span>
+          </div>
+          <div class="spec-box">
+            <span class="spec-val text-cyan">${test.markingScheme.split(' ')[0]}</span>
+            <span class="spec-lbl">Marking</span>
+          </div>
+        </div>
+
+        ${benchMarkup}
+
+        <div class="test-sections-container">
+          <div class="sec-lbl-small">Subject Sections:</div>
+          <div class="sec-pills-row">
+            ${secPills}
+          </div>
+        </div>
+
+        <ul class="test-highlights-list">
+          ${highlightsList}
+        </ul>
+
+        <div class="test-actions-row">
+          <button type="button" class="btn-chap-practice" onclick="window.startFullTest('${test.id}', 'practice')">
+            <i class="bi bi-book-half"></i> Practice Paper
+          </button>
+          <button type="button" class="btn-chap-quiz" onclick="window.startFullTest('${test.id}', 'test')">
+            <i class="bi bi-stopwatch-fill"></i> Take Full CBT Mock (180m)
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+window.startFullTest = async function(testId, mode) {
+  if (!state.mcq.testSeriesCatalog || !state.mcq.questionsBank) {
+    await loadMCQData();
+  }
+
+  const allTests = (state.mcq.testSeriesCatalog['NEET-UG'] || []).concat(state.mcq.testSeriesCatalog['JEE-MAIN'] || []);
+  const testConfig = allTests.find(t => t.id === testId);
+  if (!testConfig) return;
+
+  const bank = state.mcq.questionsBank || [];
+  
+  // Filter questions for this specific test (e.g. NEET-2024-FULL with all 180 questions)
+  let examQuestions = bank.filter(q => q.testId === testId);
+  if (examQuestions.length === 0) {
+    examQuestions = bank.filter(q => q.exam === testConfig.exam);
+  }
+  
+  // Sort questions by official question number 1..180
+  examQuestions.sort((a, b) => (a.qNumber || 0) - (b.qNumber || 0));
+
+  // Clear previous timer
+  if (state.mcq.activeSession && state.mcq.activeSession.timerInterval) {
+    clearInterval(state.mcq.activeSession.timerInterval);
+  }
+
+  const durationSec = (testConfig.durationMinutes || 180) * 60;
+
+  state.mcq.activeSession = {
+    testId: testId,
+    isFullTest: true,
+    testConfig: testConfig,
+    chapterTitle: testConfig.title,
+    subjectName: testConfig.exam === 'NEET-UG' ? `NEET UG (${examQuestions.length} Questions)` : `JEE Main (${examQuestions.length} Questions)`,
+    mode: mode,
+    isReviewMode: false,
+    questions: examQuestions,
+    currentIndex: 0,
+    currentSectionId: (testConfig.sections && testConfig.sections.length > 0) ? testConfig.sections[0].id : null,
+    userAnswers: {},
+    bookmarked: {},
+    startTime: Date.now(),
+    timeLeftSeconds: mode === 'test' ? durationSec : 999999,
+    timerInterval: null
+  };
+
+  // Toggle view containers
+  const browserView = document.getElementById('mcq-browser-view');
+  const playerView = document.getElementById('mcq-player-view');
+  if (browserView) browserView.style.display = 'none';
+  if (playerView) playerView.style.display = 'block';
+
+  // Setup header
+  const subjBadge = document.getElementById('mcq-player-subj-badge');
+  if (subjBadge) subjBadge.textContent = `${testConfig.exam} • Year ${testConfig.year} (${examQuestions.length} Questions)`;
+
+  const chapTitle = document.getElementById('mcq-player-chap-title');
+  if (chapTitle) chapTitle.textContent = testConfig.title;
+
+  const modeIndicator = document.getElementById('mcq-mode-indicator');
+  if (modeIndicator) {
+    modeIndicator.textContent = mode === 'test' ? `Official CBT Mock (${testConfig.durationMinutes || 180} Mins • 720 Marks)` : 'Self-Paced Paper Practice with Solutions';
+    modeIndicator.style.background = mode === 'test' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)';
+    modeIndicator.style.color = mode === 'test' ? '#f87171' : '#34d399';
+  }
+
+  // Section switcher bar
+  const secBar = document.getElementById('mcq-section-switcher-bar');
+  if (secBar && testConfig.sections && testConfig.sections.length > 0) {
+    secBar.style.display = 'flex';
+    renderPlayerSectionPills();
+  } else if (secBar) {
+    secBar.style.display = 'none';
+  }
+
+  const timerBox = document.getElementById('mcq-timer-box');
+  const sidePalette = document.getElementById('mcq-side-palette');
+
+  if (mode === 'test') {
+    if (timerBox) timerBox.style.display = 'inline-flex';
+    if (sidePalette) sidePalette.style.display = 'block';
+
+    updateTimerDisplay(state.mcq.activeSession.timeLeftSeconds);
+
+    state.mcq.activeSession.timerInterval = setInterval(() => {
+      if (!state.mcq.activeSession) return;
+      state.mcq.activeSession.timeLeftSeconds--;
+      updateTimerDisplay(state.mcq.activeSession.timeLeftSeconds);
+
+      if (state.mcq.activeSession.timeLeftSeconds <= 0) {
+        clearInterval(state.mcq.activeSession.timerInterval);
+        alert('Test time is up! Automatically submitting your paper.');
+        window.finishMCQSession();
+      }
+    }, 1000);
+  } else {
+    if (timerBox) timerBox.style.display = 'none';
+    if (sidePalette) sidePalette.style.display = 'block'; // Keep palette accessible for quick 180 question navigation
+  }
+
+  renderMCQCurrentQuestion();
+  window.scrollTo({ top: document.getElementById('page-mcq-practice').offsetTop - 30, behavior: 'smooth' });
+};
+
+function renderPlayerSectionPills() {
+  const session = state.mcq.activeSession;
+  if (!session || !session.testConfig || !session.testConfig.sections) return;
+
+  const secPillsWrap = document.getElementById('mcq-sec-pills-wrap');
+  if (!secPillsWrap) return;
+
+  secPillsWrap.innerHTML = session.testConfig.sections.map(sec => {
+    const isActive = session.currentSectionId === sec.id;
+    return `
+      <button type="button" class="btn-player-sec ${isActive ? 'active' : ''}" style="${isActive ? `background: ${sec.color}; border-color: ${sec.color}; color: #fff;` : ''}" onclick="window.switchPlayerSection('${sec.id}')">
+        <i class="bi ${sec.icon}"></i> ${sec.name}
+      </button>
+    `;
+  }).join('');
+}
+
+window.switchPlayerSection = function(sectionId) {
+  const session = state.mcq.activeSession;
+  if (!session) return;
+  session.currentSectionId = sectionId;
+  
+  // Jump to first question of this section
+  const sec = (session.testConfig && session.testConfig.sections) ? session.testConfig.sections.find(s => s.id === sectionId) : null;
+  const secName = sec ? sec.name.toLowerCase() : sectionId.toLowerCase();
+
+  const qIdx = session.questions.findIndex(q => {
+    const sub = (q.subject || '').toLowerCase();
+    if (sectionId === 'physics' || secName.includes('physics')) return sub.includes('physic');
+    if (sectionId === 'chemistry' || secName.includes('chemistry')) return sub.includes('chem');
+    if (sectionId === 'biology' || secName.includes('biology')) return sub.includes('botan') || sub.includes('zool') || sub.includes('bio');
+    if (sectionId === 'mathematics' || secName.includes('math')) return sub.includes('math');
+    return sub.includes(sectionId.toLowerCase());
+  });
+
+  if (qIdx !== -1) {
+    session.currentIndex = qIdx;
+  }
+
+  renderPlayerSectionPills();
+  renderMCQCurrentQuestion();
+};
+
+window.startMCQPractice = async function(chapterId, mode) {
+  if (!state.mcq.catalog || !state.mcq.questionsBank) {
+    await loadMCQData();
+  }
+
+  // Find chapter metadata
+  let targetChapter = null;
+  let targetSubject = null;
+  const examConfig = state.mcq.catalog[state.mcq.exam];
+  if (examConfig) {
+    for (const sub of examConfig.subjects) {
+      const ch = sub.chapters.find(c => c.id === chapterId);
+      if (ch) {
+        targetChapter = ch;
+        targetSubject = sub;
+        break;
+      }
+    }
+  }
+
+  // Find questions
+  const bank = state.mcq.questionsBank || [];
+  let questions = bank.filter(q => q.chapterId === chapterId);
+
+  // Fallback: if specific chapter has few or 0 questions, grab questions from same subject or same exam
+  if (questions.length === 0) {
+    const subjectPrefix = targetSubject ? targetSubject.id.split('-')[0] : '';
+    questions = bank.filter(q => q.exam === state.mcq.exam && (q.subject.toLowerCase().includes(subjectPrefix) || !subjectPrefix));
+    if (questions.length === 0) {
+      questions = bank.filter(q => q.exam === state.mcq.exam);
+    }
+  }
+
+  if (questions.length === 0) {
+    questions = bank.slice(0, 5);
+  }
+
+  // Clear previous timer if any
+  if (state.mcq.activeSession && state.mcq.activeSession.timerInterval) {
+    clearInterval(state.mcq.activeSession.timerInterval);
+  }
+
+  const durationSec = Math.max(300, questions.length * 90);
+
+  state.mcq.activeSession = {
+    chapterId: chapterId,
+    chapterTitle: targetChapter ? targetChapter.name : 'Chapter Practice',
+    subjectName: targetSubject ? targetSubject.name : 'Science',
+    mode: mode,
+    isReviewMode: false,
+    questions: questions,
+    currentIndex: 0,
+    userAnswers: {},
+    bookmarked: {},
+    startTime: Date.now(),
+    timeLeftSeconds: durationSec,
+    timerInterval: null
+  };
+
+  // Toggle view containers
+  const browserView = document.getElementById('mcq-browser-view');
+  const playerView = document.getElementById('mcq-player-view');
+  if (browserView) browserView.style.display = 'none';
+  if (playerView) playerView.style.display = 'block';
+
+  // Setup header
+  const subjBadge = document.getElementById('mcq-player-subj-badge');
+  if (subjBadge) subjBadge.textContent = `${state.mcq.activeSession.subjectName} • ${questions.length} Questions`;
+
+  const chapTitle = document.getElementById('mcq-player-chap-title');
+  if (chapTitle) chapTitle.textContent = state.mcq.activeSession.chapterTitle;
+
+  const modeIndicator = document.getElementById('mcq-mode-indicator');
+  if (modeIndicator) {
+    modeIndicator.textContent = mode === 'test' ? 'CBT Mock Test (+4 / -1 Marking)' : 'Self-Paced Practice Mode (Instant Explanations)';
+    modeIndicator.style.background = mode === 'test' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)';
+    modeIndicator.style.color = mode === 'test' ? '#f87171' : '#34d399';
+  }
+
+  const timerBox = document.getElementById('mcq-timer-box');
+  const sidePalette = document.getElementById('mcq-side-palette');
+
+  if (mode === 'test') {
+    if (timerBox) timerBox.style.display = 'inline-flex';
+    if (sidePalette) sidePalette.style.display = 'block';
+
+    updateTimerDisplay(state.mcq.activeSession.timeLeftSeconds);
+
+    state.mcq.activeSession.timerInterval = setInterval(() => {
+      if (!state.mcq.activeSession) return;
+      state.mcq.activeSession.timeLeftSeconds--;
+      updateTimerDisplay(state.mcq.activeSession.timeLeftSeconds);
+
+      if (state.mcq.activeSession.timeLeftSeconds <= 0) {
+        clearInterval(state.mcq.activeSession.timerInterval);
+        alert('Time is up! Submitting your test automatically.');
+        window.finishMCQSession();
+      }
+    }, 1000);
+  } else {
+    if (timerBox) timerBox.style.display = 'none';
+    if (sidePalette) sidePalette.style.display = 'block'; // Keep question palette visible for easy navigation across all chapter questions
+  }
+
+  renderMCQCurrentQuestion();
+  window.scrollTo({ top: document.getElementById('page-mcq-practice').offsetTop - 30, behavior: 'smooth' });
+};
+
+function updateTimerDisplay(seconds) {
+  const display = document.getElementById('mcq-timer-display');
+  if (!display) return;
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  display.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  if (seconds <= 60) {
+    display.style.color = '#ef4444';
+  } else {
+    display.style.color = '';
+  }
+}
+
+function renderMCQCurrentQuestion() {
+  const session = state.mcq.activeSession;
+  if (!session || !session.questions || session.questions.length === 0) return;
+
+  const q = session.questions[session.currentIndex];
+  const total = session.questions.length;
+  const userAns = session.userAnswers[q.id];
+  const isAnswered = !!userAns;
+  const isPractice = session.mode === 'practice' || session.isReviewMode;
+
+  // Auto-sync active section tab if in full test
+  if (session.testConfig && session.testConfig.sections && session.testConfig.sections.length > 0) {
+    const sub = (q.subject || '').toLowerCase();
+    const matchingSec = session.testConfig.sections.find(s => {
+      const sId = s.id.toLowerCase();
+      if (sId === 'physics' && sub.includes('physic')) return true;
+      if (sId === 'chemistry' && sub.includes('chem')) return true;
+      if (sId === 'biology' && (sub.includes('botan') || sub.includes('zool') || sub.includes('bio'))) return true;
+      if (sId === 'mathematics' && sub.includes('math')) return true;
+      return false;
+    });
+    if (matchingSec && session.currentSectionId !== matchingSec.id) {
+      session.currentSectionId = matchingSec.id;
+      renderPlayerSectionPills();
+    }
+  }
+
+  // Metadata tags
+  const numEl = document.getElementById('mcq-q-num');
+  if (numEl) numEl.textContent = `Question ${session.currentIndex + 1} of ${total} • ${q.subject || ''}`;
+
+  const yearEl = document.getElementById('mcq-q-year');
+  if (yearEl) yearEl.textContent = `PYQ ${q.year || '2024'}`;
+
+  const diffEl = document.getElementById('mcq-q-diff');
+  if (diffEl) {
+    diffEl.textContent = q.difficulty || 'Moderate';
+    diffEl.className = 'mcq-tag-diff ' + (q.difficulty && q.difficulty.toLowerCase().includes('easy') ? 'diff-easy' : 'diff-mod');
+  }
+
+  // Question statement
+  const textEl = document.getElementById('mcq-q-text');
+  if (textEl) textEl.innerHTML = `<p>${q.question}</p>`;
+
+  // Options List
+  const optsContainer = document.getElementById('mcq-options-list');
+  if (optsContainer) {
+    optsContainer.innerHTML = (q.options || []).map(opt => {
+      let extraClass = '';
+      let statusIcon = '';
+
+      if (isPractice && isAnswered) {
+        if (opt.id === q.correct) {
+          extraClass = 'correct-opt';
+          statusIcon = '<i class="bi bi-check-circle-fill text-success" style="margin-left: auto;"></i>';
+        } else if (opt.id === userAns) {
+          extraClass = 'incorrect-opt';
+          statusIcon = '<i class="bi bi-x-circle-fill text-danger" style="margin-left: auto;"></i>';
+        }
+      } else if (opt.id === userAns) {
+        extraClass = 'selected-opt';
+      }
+
+      return `
+        <button type="button" class="mcq-option-card ${extraClass}" onclick="window.selectMCQOption('${opt.id}')">
+          <span class="mcq-opt-marker">${opt.id}</span>
+          <span class="mcq-opt-body">${opt.text}</span>
+          ${statusIcon}
+        </button>
+      `;
+    }).join('');
+  }
+
+  // Explanation box
+  const expBox = document.getElementById('mcq-explanation-box');
+  if (expBox) {
+    if (isPractice && isAnswered) {
+      expBox.style.display = 'block';
+      const expBody = document.getElementById('mcq-exp-body');
+      if (expBody) expBody.innerHTML = `<p>${q.explanation || 'Verified NCERT solution.'}</p>`;
+
+      const expNcert = document.getElementById('mcq-exp-ncert');
+      if (expNcert) {
+        expNcert.innerHTML = q.ncertRef ? `<i class="bi bi-journal-bookmark-fill text-emerald"></i> <strong>Official Reference:</strong> ${q.ncertRef}` : '';
+      }
+    } else {
+      expBox.style.display = 'none';
+    }
+  }
+
+  // Navigation Buttons
+  const prevBtn = document.getElementById('btn-mcq-prev');
+  if (prevBtn) {
+    prevBtn.disabled = session.currentIndex === 0;
+  }
+
+  const nextBtn = document.getElementById('btn-mcq-next');
+  if (nextBtn) {
+    if (session.currentIndex === total - 1) {
+      nextBtn.innerHTML = `Finish <i class="bi bi-check2-circle"></i>`;
+      nextBtn.onclick = () => window.finishMCQSession();
+    } else {
+      nextBtn.innerHTML = `Next <i class="bi bi-chevron-right"></i>`;
+      nextBtn.onclick = () => window.navMCQ(1);
+    }
+  }
+
+  // Bookmark button
+  const bookmarkBtn = document.getElementById('btn-mcq-bookmark');
+  if (bookmarkBtn) {
+    const isBookmarked = !!session.bookmarked[q.id];
+    bookmarkBtn.innerHTML = isBookmarked ? 
+      `<i class="bi bi-bookmark-fill text-gold"></i> Bookmarked` : 
+      `<i class="bi bi-bookmark"></i> Bookmark`;
+  }
+
+  // Question Palette (Test Mode or Review Mode)
+  renderMCQPalette();
+}
+
+function renderMCQPalette() {
+  const session = state.mcq.activeSession;
+  if (!session) return;
+
+  const grid = document.getElementById('palette-grid');
+  const summary = document.getElementById('palette-summary');
+
+  let answeredCount = 0;
+  session.questions.forEach(q => {
+    if (session.userAnswers[q.id]) answeredCount++;
+  });
+
+  if (summary) {
+    summary.textContent = `${answeredCount} / ${session.questions.length} Answered`;
+  }
+
+  if (grid) {
+    grid.innerHTML = session.questions.map((q, idx) => {
+      let stateClass = 'unanswered';
+      if (session.userAnswers[q.id]) {
+        stateClass = 'answered';
+      }
+      if (session.bookmarked[q.id]) {
+        stateClass += ' bookmarked';
+      }
+      if (idx === session.currentIndex) {
+        stateClass += ' current';
+      }
+
+      return `
+        <button type="button" class="palette-q-btn ${stateClass}" onclick="window.jumpToMCQQuestion(${idx})">
+          ${idx + 1}
+        </button>
+      `;
+    }).join('');
+  }
+}
+
+window.selectMCQOption = function(optId) {
+  const session = state.mcq.activeSession;
+  if (!session) return;
+  const q = session.questions[session.currentIndex];
+  session.userAnswers[q.id] = optId;
+  renderMCQCurrentQuestion();
+};
+
+window.clearMCQOption = function() {
+  const session = state.mcq.activeSession;
+  if (!session) return;
+  const q = session.questions[session.currentIndex];
+  delete session.userAnswers[q.id];
+  renderMCQCurrentQuestion();
+};
+
+window.toggleMCQBookmark = function() {
+  const session = state.mcq.activeSession;
+  if (!session) return;
+  const q = session.questions[session.currentIndex];
+  session.bookmarked[q.id] = !session.bookmarked[q.id];
+  renderMCQCurrentQuestion();
+};
+
+window.navMCQ = function(delta) {
+  const session = state.mcq.activeSession;
+  if (!session) return;
+  const newIdx = session.currentIndex + delta;
+  if (newIdx >= 0 && newIdx < session.questions.length) {
+    session.currentIndex = newIdx;
+    renderMCQCurrentQuestion();
+  }
+};
+
+window.jumpToMCQQuestion = function(idx) {
+  const session = state.mcq.activeSession;
+  if (!session) return;
+  if (idx >= 0 && idx < session.questions.length) {
+    session.currentIndex = idx;
+    renderMCQCurrentQuestion();
+  }
+};
+
+window.finishMCQSession = function() {
+  const session = state.mcq.activeSession;
+  if (!session) return;
+
+  if (session.timerInterval) {
+    clearInterval(session.timerInterval);
+    session.timerInterval = null;
+  }
+
+  let correct = 0;
+  let incorrect = 0;
+  let skipped = 0;
+
+  session.questions.forEach(q => {
+    const ans = session.userAnswers[q.id];
+    if (ans) {
+      if (ans === q.correct) {
+        correct++;
+      } else {
+        incorrect++;
+      }
+    } else {
+      skipped++;
+    }
+  });
+
+  const rawScore = (correct * 4) - (incorrect * 1);
+  const maxScore = session.questions.length * 4;
+  const totalAttempted = correct + incorrect;
+  const accuracy = totalAttempted > 0 ? Math.round((correct / totalAttempted) * 100) : 0;
+
+  const timeSpentSec = Math.round((Date.now() - session.startTime) / 1000);
+  const mins = Math.floor(timeSpentSec / 60);
+  const secs = timeSpentSec % 60;
+  const timeStr = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+
+  // Populate results modal
+  const resTitle = document.getElementById('mcq-res-title');
+  if (resTitle) resTitle.textContent = session.mode === 'test' ? 'Mock Test Completed!' : 'Practice Session Summary';
+
+  const resSub = document.getElementById('mcq-res-subtitle');
+  if (resSub) resSub.textContent = `${session.chapterTitle} • ${session.subjectName}`;
+
+  const resScore = document.getElementById('mcq-res-score');
+  if (resScore) {
+    const prefix = rawScore >= 0 ? `+${rawScore}` : `${rawScore}`;
+    resScore.innerHTML = `${prefix} <span style="font-size: 16px; color: var(--text-muted);">/ ${maxScore}</span>`;
+  }
+
+  const resAcc = document.getElementById('mcq-res-accuracy');
+  if (resAcc) resAcc.textContent = `${accuracy}% Accuracy`;
+
+  const resCorr = document.getElementById('mcq-res-correct');
+  if (resCorr) resCorr.textContent = correct;
+
+  const resIncorr = document.getElementById('mcq-res-incorrect');
+  if (resIncorr) resIncorr.textContent = incorrect;
+
+  const resSkip = document.getElementById('mcq-res-skipped');
+  if (resSkip) resSkip.textContent = skipped;
+
+  const resTime = document.getElementById('mcq-res-time');
+  if (resTime) resTime.textContent = timeStr;
+
+  // Wire Predictor Bridge
+  const bridgeBtn = document.getElementById('btn-mcq-bridge-predict');
+  if (bridgeBtn) {
+    bridgeBtn.onclick = () => {
+      document.getElementById('mcq-results-modal-backdrop').classList.remove('open');
+
+      const isJEE = (session.testConfig && session.testConfig.exam === 'JEE-MAIN') || state.mcq.exam === 'JEE-MAIN';
+      const targetExam = isJEE ? 'JEE-MAIN' : 'NEET-UG';
+
+      // Scale score
+      const ratio = Math.max(0.1, Math.min(1.0, (correct / (session.questions.length || 1))));
+      const simulatedScore = isJEE ? Math.round(ratio * 300) : Math.round(ratio * 720);
+
+      switchPage('page-predictor');
+      switchExam(targetExam);
+
+      const btnScore = document.getElementById('btn-mode-score');
+      if (btnScore) btnScore.click();
+
+      const scoreInput = document.getElementById('input-rank');
+      if (scoreInput) {
+        scoreInput.value = simulatedScore;
+        state.filters.score = simulatedScore;
+      }
+
+      runPrediction();
+      document.getElementById('results-section').scrollIntoView({ behavior: 'smooth' });
+    };
+  }
+
+  // Open modal
+  const modal = document.getElementById('mcq-results-modal-backdrop');
+  if (modal) modal.classList.add('open');
+};
+
+window.reviewMCQAnswers = function() {
+  const modal = document.getElementById('mcq-results-modal-backdrop');
+  if (modal) modal.classList.remove('open');
+
+  if (state.mcq.activeSession) {
+    state.mcq.activeSession.isReviewMode = true;
+    state.mcq.activeSession.currentIndex = 0;
+    
+    // Hide timer, show palette
+    const timerBox = document.getElementById('mcq-timer-box');
+    if (timerBox) timerBox.style.display = 'none';
+
+    const sidePalette = document.getElementById('mcq-side-palette');
+    if (sidePalette) sidePalette.style.display = 'block';
+
+    const modeIndicator = document.getElementById('mcq-mode-indicator');
+    if (modeIndicator) {
+      modeIndicator.textContent = 'Reviewing Verified Answers & NCERT Explanations';
+      modeIndicator.style.background = 'rgba(56, 189, 248, 0.15)';
+      modeIndicator.style.color = '#38bdf8';
+    }
+
+    renderMCQCurrentQuestion();
+  }
+};
+
+window.exitMCQPlayer = function() {
+  if (state.mcq.activeSession && state.mcq.activeSession.timerInterval) {
+    clearInterval(state.mcq.activeSession.timerInterval);
+    state.mcq.activeSession.timerInterval = null;
+  }
+
+  const modal = document.getElementById('mcq-results-modal-backdrop');
+  if (modal) modal.classList.remove('open');
+
+  state.mcq.activeSession = null;
+
+  const secBar = document.getElementById('mcq-section-switcher-bar');
+  if (secBar) secBar.style.display = 'none';
+
+  const browserView = document.getElementById('mcq-browser-view');
+  const playerView = document.getElementById('mcq-player-view');
+  if (playerView) playerView.style.display = 'none';
+  if (browserView) browserView.style.display = 'block';
+
+  const chapContainer = document.getElementById('mcq-chapters-container');
+  const seriesView = document.getElementById('mcq-test-series-view');
+  if (chapContainer) chapContainer.style.display = state.mcq.viewMode === 'chapters' ? 'block' : 'none';
+  if (seriesView) seriesView.style.display = state.mcq.viewMode === 'test-series' ? 'block' : 'none';
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
 
 // -------------------------------------------------------------
 // App Initialization

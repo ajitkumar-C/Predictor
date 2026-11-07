@@ -1,0 +1,419 @@
+{
+  "NEET-UG": {
+    "name": "NEET UG (Medical Entrance)",
+    "subjects": [
+      {
+        "id": "biology",
+        "name": "Biology (Botany & Zoology)",
+        "icon": "bi-virus2",
+        "color": "#10b981",
+        "totalPYQs": 48,
+        "chapters": [
+          {
+            "id": "genetics-evolution",
+            "name": "Genetics & Molecular Basis of Inheritance",
+            "class": "Class 12",
+            "pyqCount": 25,
+            "weightage": "14% (High Yield)",
+            "difficulty": "Moderate",
+            "keyTopics": [
+              "DNA Replication",
+              "Mendelian Ratios",
+              "Transcription",
+              "Genetic Code",
+              "Lac Operon"
+            ]
+          },
+          {
+            "id": "human-physiology",
+            "name": "Human Physiology & Organ Systems",
+            "class": "Class 11",
+            "pyqCount": 45,
+            "weightage": "16% (Core)",
+            "difficulty": "Easy to Moderate",
+            "keyTopics": [
+              "Cardiac Cycle",
+              "ECG",
+              "Nephron Counter-Current",
+              "Neural Conduction",
+              "Hormones"
+            ]
+          },
+          {
+            "id": "cell-biology",
+            "name": "Cell: Structure & Cell Cycle Division",
+            "class": "Class 11",
+            "pyqCount": 20,
+            "weightage": "10%",
+            "difficulty": "Easy",
+            "keyTopics": [
+              "Mitosis vs Meiosis",
+              "Organelles",
+              "Fluid Mosaic Model",
+              "Crossing Over"
+            ]
+          },
+          {
+            "id": "biotechnology",
+            "name": "Biotechnology: Principles & Applications",
+            "class": "Class 12",
+            "pyqCount": 3,
+            "weightage": "9%",
+            "difficulty": "Moderate",
+            "keyTopics": [
+              "rDNA Technology",
+              "PCR",
+              "Restriction Enzymes",
+              "Gene Therapy",
+              "Bt Cotton"
+            ]
+          },
+          {
+            "id": "ecology-environment",
+            "name": "Ecology & Environmental Biology",
+            "class": "Class 12",
+            "pyqCount": 7,
+            "weightage": "11%",
+            "difficulty": "Easy",
+            "keyTopics": [
+              "Ecological Pyramids",
+              "Biodiversity Hotspots",
+              "Population Interactions",
+              "Biomagnification"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "physics-neet",
+        "name": "Physics",
+        "icon": "bi-lightning-charge",
+        "color": "#0ea5e9",
+        "totalPYQs": 35,
+        "chapters": [
+          {
+            "id": "current-electricity",
+            "name": "Current Electricity & Circuits",
+            "class": "Class 12",
+            "pyqCount": 25,
+            "weightage": "9%",
+            "difficulty": "Moderate",
+            "keyTopics": [
+              "Kirchhoff's Laws",
+              "Wheatstone Bridge",
+              "Potentiometer",
+              "Meter Bridge",
+              "Resistor Networks"
+            ]
+          },
+          {
+            "id": "mechanics-kinematics",
+            "name": "Mechanics, Laws of Motion & Work-Energy",
+            "class": "Class 11",
+            "pyqCount": 20,
+            "weightage": "12%",
+            "difficulty": "Moderate",
+            "keyTopics": [
+              "Friction",
+              "Conservation of Momentum",
+              "Circular Motion",
+              "Work-Energy Theorem"
+            ]
+          },
+          {
+            "id": "optics",
+            "name": "Ray Optics & Optical Instruments",
+            "class": "Class 12",
+            "pyqCount": 2,
+            "weightage": "10%",
+            "difficulty": "Moderate",
+            "keyTopics": [
+              "Prism Deviation",
+              "Lens Formula",
+              "Compound Microscope",
+              "TIR & Optical Fibres"
+            ]
+          },
+          {
+            "id": "modern-physics-neet",
+            "name": "Modern Physics & Semiconductors",
+            "class": "Class 12",
+            "pyqCount": 2,
+            "weightage": "11% (High Scoring)",
+            "difficulty": "Easy",
+            "keyTopics": [
+              "Photoelectric Effect",
+              "Bohr Hydrogen Model",
+              "p-n Junction Diodes",
+              "Logic Gates"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "chemistry-neet",
+        "name": "Chemistry",
+        "icon": "bi-eyedropper",
+        "color": "#f59e0b",
+        "totalPYQs": 32,
+        "chapters": [
+          {
+            "id": "chemical-bonding",
+            "name": "Chemical Bonding & Molecular Structure",
+            "class": "Class 11",
+            "pyqCount": 5,
+            "weightage": "10%",
+            "difficulty": "Moderate",
+            "keyTopics": [
+              "VSEPR Theory",
+              "Hybridisation",
+              "Molecular Orbital Theory (MOT)",
+              "Dipole Moment"
+            ]
+          },
+          {
+            "id": "goc-organic",
+            "name": "General Organic Chemistry (GOC) & Hydrocarbons",
+            "class": "Class 11",
+            "pyqCount": 25,
+            "weightage": "12%",
+            "difficulty": "Moderate",
+            "keyTopics": [
+              "Inductive & Resonance Effects",
+              "Carbocation Stability",
+              "Electrophilic Addition",
+              "Aromaticity"
+            ]
+          },
+          {
+            "id": "coordination-compounds",
+            "name": "Coordination Compounds & d-Block",
+            "class": "Class 12",
+            "pyqCount": 6,
+            "weightage": "9%",
+            "difficulty": "Moderate",
+            "keyTopics": [
+              "Crystal Field Theory (CFT)",
+              "IUPAC Nomenclature",
+              "Isomerism",
+              "Magnetic Moments"
+            ]
+          },
+          {
+            "id": "electrochem-kinetics",
+            "name": "Electrochemistry & Chemical Kinetics",
+            "class": "Class 12",
+            "pyqCount": 13,
+            "weightage": "9%",
+            "difficulty": "Moderate",
+            "keyTopics": [
+              "Nernst Equation",
+              "Kohlrausch Law",
+              "First-Order Rate Law",
+              "Arrhenius Equation"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "JEE-MAIN": {
+    "name": "JEE Main (Engineering Entrance)",
+    "subjects": [
+      {
+        "id": "physics-jee",
+        "name": "Physics",
+        "icon": "bi-lightning-charge",
+        "color": "#0ea5e9",
+        "totalPYQs": 38,
+        "chapters": [
+          {
+            "id": "rotational-motion",
+            "name": "Rotational Motion & Rigid Body Dynamics",
+            "class": "Class 11",
+            "pyqCount": 7,
+            "weightage": "8%",
+            "difficulty": "Hard",
+            "keyTopics": [
+              "Moment of Inertia",
+              "Rolling Without Slipping",
+              "Angular Momentum Conservation",
+              "Torque"
+            ]
+          },
+          {
+            "id": "electrostatics-capacitance",
+            "name": "Electrostatics & Capacitance",
+            "class": "Class 12",
+            "pyqCount": 9,
+            "weightage": "9%",
+            "difficulty": "Moderate",
+            "keyTopics": [
+              "Gauss Law",
+              "Electric Dipole",
+              "Capacitor with Dielectrics",
+              "Electric Potential"
+            ]
+          },
+          {
+            "id": "current-magnetism",
+            "name": "Moving Charges, Magnetism & EMI",
+            "class": "Class 12",
+            "pyqCount": 5,
+            "weightage": "9%",
+            "difficulty": "Moderate",
+            "keyTopics": [
+              "Biot-Savart Law",
+              "Faraday-Lenz Law",
+              "Motional EMF",
+              "AC Circuits (LCR Resonance)"
+            ]
+          },
+          {
+            "id": "thermodynamics-ktg",
+            "name": "Thermodynamics & Kinetic Theory of Gases",
+            "class": "Class 11",
+            "pyqCount": 9,
+            "weightage": "8%",
+            "difficulty": "Moderate",
+            "keyTopics": [
+              "First & Second Law",
+              "Carnot Engine Efficiency",
+              "Adiabatic Processes",
+              "Mean Free Path"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "chemistry-jee",
+        "name": "Chemistry",
+        "icon": "bi-eyedropper",
+        "color": "#f59e0b",
+        "totalPYQs": 36,
+        "chapters": [
+          {
+            "id": "chemical-bonding-jee",
+            "name": "Chemical Bonding & Molecular Orbitals",
+            "class": "Class 11",
+            "pyqCount": 4,
+            "weightage": "10%",
+            "difficulty": "Moderate",
+            "keyTopics": [
+              "Bond Order by MOT",
+              "Hybridisation & Geometry",
+              "Dipole Moments",
+              "Hydrogen Bonding"
+            ]
+          },
+          {
+            "id": "organic-mechanisms",
+            "name": "Organic Reaction Mechanisms & Carbonyls",
+            "class": "Class 12",
+            "pyqCount": 8,
+            "weightage": "14%",
+            "difficulty": "Hard",
+            "keyTopics": [
+              "Aldol & Cannizzaro Condensation",
+              "SN1 vs SN2",
+              "Diazonium Salts",
+              "Grignard Reagents"
+            ]
+          },
+          {
+            "id": "coordination-jee",
+            "name": "Coordination Chemistry & Metallurgy",
+            "class": "Class 12",
+            "pyqCount": 6,
+            "weightage": "9%",
+            "difficulty": "Moderate",
+            "keyTopics": [
+              "CFT Splitting Energy",
+              "Synergic Bonding",
+              "Stereoisomerism",
+              "Werner's Theory"
+            ]
+          },
+          {
+            "id": "thermo-solutions",
+            "name": "Thermodynamics, Equilibrium & Solutions",
+            "class": "Class 11/12",
+            "pyqCount": 11,
+            "weightage": "10%",
+            "difficulty": "Moderate",
+            "keyTopics": [
+              "Gibbs Free Energy Delta G",
+              "Raoult's Law & Colligative Properties",
+              "pH of Buffer Solutions"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "mathematics-jee",
+        "name": "Mathematics",
+        "icon": "bi-calculator",
+        "color": "#8b5cf6",
+        "totalPYQs": 40,
+        "chapters": [
+          {
+            "id": "calculus-integration",
+            "name": "Integral Calculus & Differential Equations",
+            "class": "Class 12",
+            "pyqCount": 8,
+            "weightage": "14% (Core)",
+            "difficulty": "Hard",
+            "keyTopics": [
+              "Definite Integrals (King Property)",
+              "Area Under Curve",
+              "Linear Differential Equations",
+              "Variable Separable"
+            ]
+          },
+          {
+            "id": "matrices-determinants",
+            "name": "Matrices & System of Linear Equations",
+            "class": "Class 12",
+            "pyqCount": 3,
+            "weightage": "8% (Scoring)",
+            "difficulty": "Easy to Moderate",
+            "keyTopics": [
+              "Cramer's Rule for Consistency",
+              "Inverse of Matrix",
+              "Cayley-Hamilton Theorem",
+              "Symmetric/Skew-Symmetric"
+            ]
+          },
+          {
+            "id": "vectors-3d",
+            "name": "Vector Algebra & Three-Dimensional Geometry",
+            "class": "Class 12",
+            "pyqCount": 4,
+            "weightage": "11% (High Scoring)",
+            "difficulty": "Moderate",
+            "keyTopics": [
+              "Shortest Distance Between Skew Lines",
+              "Dot & Cross Product",
+              "Direction Cosines",
+              "Plane-Line Intersection"
+            ]
+          },
+          {
+            "id": "coordinate-conics",
+            "name": "Conic Sections: Parabola, Ellipse & Hyperbola",
+            "class": "Class 11",
+            "pyqCount": 14,
+            "weightage": "10%",
+            "difficulty": "Hard",
+            "keyTopics": [
+              "Tangents & Normals",
+              "Eccentricity",
+              "Focal Distance",
+              "Auxiliary Circle"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
