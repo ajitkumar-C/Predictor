@@ -42,3 +42,4 @@ html = html.replace(/"Is MargDarshak Cutoff Predictor/, '"Is NeetJeePredictor.in
 
 fs.writeFileSync('index.html', html, 'utf8');
 console.log('Done! All MargDarshak references updated.');
+

@@ -20,3 +20,4 @@ html = html
 
 fs.writeFileSync('index.html', html, 'utf8');
 console.log('Done! All remaining MargDarshak references replaced.');
+
