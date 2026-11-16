@@ -30,3 +30,4 @@ for (const file of files) {
     console.log(`Added GTM to ${file}`);
   }
 }
+

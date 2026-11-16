@@ -9,7 +9,8 @@ export default defineConfig({
         main: resolve(__dirname, 'index.html'),
         privacy: resolve(__dirname, 'privacy-policy.html'),
         terms: resolve(__dirname, 'terms-and-conditions.html'),
-        contact: resolve(__dirname, 'contact-us.html')
+        contact: resolve(__dirname, 'contact-us.html'),
+        neetMarksVsRank: resolve(__dirname, 'neet-marks-vs-rank-2026.html')
       }
     }
   }

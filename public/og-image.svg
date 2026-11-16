@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b1329"/>
+      <stop offset="50%" stop-color="#1e3a8a"/>
+      <stop offset="100%" stop-color="#2563eb"/>
+    </linearGradient>
+    <linearGradient id="goldAccent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#f97316"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="30" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- Subtle Ambient Glow Circles -->
+  <circle cx="200" cy="150" r="280" fill="#3b82f6" opacity="0.18" filter="url(#glow)"/>
+  <circle cx="1050" cy="480" r="320" fill="#f97316" opacity="0.14" filter="url(#glow)"/>
+
+  <!-- Decorative Target Graphic -->
+  <g transform="translate(980, 180)" opacity="0.25">
+    <circle cx="0" cy="0" r="140" fill="none" stroke="#ffffff" stroke-width="3" stroke-dasharray="8 8"/>
+    <circle cx="0" cy="0" r="95" fill="none" stroke="#ffffff" stroke-width="4"/>
+    <circle cx="0" cy="0" r="50" fill="none" stroke="#ffffff" stroke-width="4"/>
+    <circle cx="0" cy="0" r="16" fill="#f97316"/>
+  </g>
+
+  <!-- Main Content Card Box -->
+  <g transform="translate(100, 110)">
+    <!-- Top Pill Badge -->
+    <rect x="0" y="0" width="460" height="42" rx="21" fill="rgba(255,255,255,0.12)" stroke="rgba(255,255,255,0.25)" stroke-width="1.5"/>
+    <circle cx="22" cy="21" r="8" fill="#10b981"/>
+    <text x="42" y="27" font-family="'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" font-size="16" font-weight="700" fill="#ffffff" letter-spacing="0.5">
+      100% FREE • NO LOGIN • OFFICIAL 2024–2026 DATA
+    </text>
+
+    <!-- Brand Name -->
+    <text x="0" y="115" font-family="'Outfit', system-ui, -apple-system, sans-serif" font-size="62" font-weight="800" fill="#ffffff" letter-spacing="-1">
+      NeetJeePredictor<tspan fill="#f97316">.in</tspan>
+    </text>
+
+    <!-- Main Title -->
+    <text x="0" y="195" font-family="'Outfit', system-ui, -apple-system, sans-serif" font-size="52" font-weight="800" fill="url(#goldAccent)" letter-spacing="-0.5">
+      NEET &amp; JEE Rank Predictor 2026
+    </text>
+
+    <!-- Subtitle description -->
+    <text x="0" y="255" font-family="'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" font-size="24" font-weight="500" fill="#cbd5e1" width="850">
+      Cutoff Predictions for All 25 AIIMS, 23 IITs, 31 NITs, IIITs &amp; State GMCs
+    </text>
+
+    <!-- Feature Tags -->
+    <g transform="translate(0, 310)">
+      <!-- Tag 1 -->
+      <rect x="0" y="0" width="230" height="48" rx="12" fill="rgba(15, 23, 42, 0.6)" stroke="#38bdf8" stroke-width="1.5"/>
+      <text x="115" y="30" text-anchor="middle" font-family="system-ui, sans-serif" font-size="17" font-weight="700" fill="#38bdf8">🩺 NEET UG &amp; PG</text>
+
+      <!-- Tag 2 -->
+      <rect x="250" y="0" width="240" height="48" rx="12" fill="rgba(15, 23, 42, 0.6)" stroke="#fbbf24" stroke-width="1.5"/>
+      <text x="370" y="30" text-anchor="middle" font-family="system-ui, sans-serif" font-size="17" font-weight="700" fill="#fbbf24">⚙️ JEE Main &amp; Advanced</text>
+
+      <!-- Tag 3 -->
+      <rect x="510" y="0" width="230" height="48" rx="12" fill="rgba(15, 23, 42, 0.6)" stroke="#34d399" stroke-width="1.5"/>
+      <text x="625" y="30" text-anchor="middle" font-family="system-ui, sans-serif" font-size="17" font-weight="700" fill="#34d399">📊 Marks vs Rank 2026</text>
+    </g>
+  </g>
+
+  <!-- Bottom Strip -->
+  <rect x="0" y="585" width="1200" height="45" fill="rgba(11, 19, 41, 0.85)"/>
+  <text x="100" y="613" font-family="system-ui, sans-serif" font-size="16" font-weight="600" fill="#94a3b8">
+    https://neetjeepredictor.in — Instant Category-wise (General, OBC, EWS, SC, ST) Prediction &amp; Choice Filling
+  </text>
+</svg>
